@@ -50,7 +50,6 @@ class _LoginPageState extends State<LoginPage> {
               const SizedBox(height: 10),
               ElevatedButton.icon(
                 onPressed: () {
-                  // Aqui você pode chamar lógica de login com Google
                 },
                 icon: const Icon(Icons.g_mobiledata, size: 40),
                 label: const Text('Entre com sua conta Google'),
