@@ -1,20 +1,20 @@
 import 'package:flutter/material.dart';
+import 'pages/initial_page.dart';
 
 void main() {
-  runApp(const MainApp());
+  runApp(const JubiTasksApp());
 }
 
-class MainApp extends StatelessWidget {
-  const MainApp({super.key});
+class JubiTasksApp extends StatelessWidget {
+  const JubiTasksApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return const MaterialApp(
-      home: Scaffold(
-        body: Center(
-          child: Text('Hello World!'),
-        ),
-      ),
+    return MaterialApp(
+      title: 'JubiTasks',
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(fontFamily: 'Arial'),
+      home: const HomePage(),
     );
   }
 }
