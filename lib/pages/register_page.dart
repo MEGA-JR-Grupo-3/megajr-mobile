@@ -109,7 +109,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       // Call your backend API to register the user
       final response = await http.post(
         Uri.parse(
-          'https://megajr-back-end.onrender.com/cadastro-usuario',
+          'https://megajr-back-end.onrender.com/cadastro',
         ), // Replace with your actual backend endpoint
         headers: <String, String>{
           'Content-Type': 'application/json; charset=UTF-8',

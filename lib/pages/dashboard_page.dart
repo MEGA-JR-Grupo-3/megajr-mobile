@@ -3,13 +3,13 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:reorderable_grid_view/reorderable_grid_view.dart';
 
-import 'models/task_model.dart';
-import 'services/auth_service.dart';
-import 'services/api_service.dart';
-import 'widgets/task_card.dart';
-import 'widgets/add_task_form.dart';
-import 'widgets/sidebar_drawer.dart';
-import 'widgets/search_input.dart';
+import '../models/task_model.dart';
+import '../services/auth_service.dart';
+import '../services/api_service.dart';
+import '../widgets/task_card.dart';
+import '../widgets/add_task_form.dart';
+import '../widgets/sidebar_drawer.dart';
+import '../widgets/search_input.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});

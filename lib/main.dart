@@ -64,7 +64,7 @@ class MyApp extends StatelessWidget {
         // Rota para a tela de login.
         '/login': (context) => const LoginScreen(),
         // Rota para a tela de dashboard.
-        '/dashboard': (context) => const TelaPrincipal(),
+        '/dashboard': (context) => const DashboardScreen(),
         // Rota para a tela de registro.
         '/register': (context) => const RegisterScreen(),
       },

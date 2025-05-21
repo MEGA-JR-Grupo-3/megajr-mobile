@@ -107,7 +107,6 @@ class _LoginScreenState extends State<LoginScreen> {
     if (user != null) {
       print("Login com Google Sucesso: ${user.displayName}");
       // You'll need to implement actual Google Sign-In for Flutter.
-      // This is just a placeholder for the callback logic.
 
       // Example of sending user data to your backend after Google login
       final userName = user.displayName;

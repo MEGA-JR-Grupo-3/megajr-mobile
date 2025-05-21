@@ -31,7 +31,7 @@ class _AddTaskFormWidgetState extends State<AddTaskFormWidget> {
 
   bool _isLoading = false;
 
-  final List<String> _priorities = ['Baixa', 'Média', 'Alta'];
+  final List<String> _priorities = ['Baixa', 'Média', 'Alta', 'Urgente'];
   final List<String> _statuses = ['Pendente', 'Em Progresso', 'Concluída'];
 
   @override
