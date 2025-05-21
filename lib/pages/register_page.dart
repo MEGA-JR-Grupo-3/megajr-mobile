@@ -118,7 +118,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           'name': name,
           'email': email,
           'senha':
-              password, // Assuming 'senha' is the field name on your backend
+              password,
         }),
       );
 

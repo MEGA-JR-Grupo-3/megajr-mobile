@@ -2,20 +2,24 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
-import '/firebase_options.dart';
+import 'firebase_options.dart';
 import 'package:mobile_megajr_grupo3/pages/login_page.dart';
 import 'package:mobile_megajr_grupo3/pages/register_page.dart';
 import 'package:mobile_megajr_grupo3/pages/dashboard_page.dart';
 import 'package:mobile_megajr_grupo3/pages/initial_page.dart';
 import 'package:mobile_megajr_grupo3/pages/splash_screen.dart';
 import 'package:mobile_megajr_grupo3/providers/theme_provider.dart';
+import 'package:mobile_megajr_grupo3/services/auth_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   runApp(
-    ChangeNotifierProvider(
-      create: (context) => ThemeProvider(),
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (context) => ThemeProvider()),
+        Provider<AuthService>(create: (context) => AuthService()),
+      ],
       child: const MyApp(),
     ),
   );
@@ -35,7 +39,6 @@ class MyApp extends StatelessWidget {
         primarySwatch: Colors.blue,
         visualDensity: VisualDensity.adaptivePlatformDensity,
         brightness: Brightness.light,
-        // Define other light theme properties
       ),
       darkTheme: ThemeData(
         primarySwatch: Colors.blue,
@@ -45,22 +48,24 @@ class MyApp extends StatelessWidget {
         appBarTheme: AppBarTheme(
           backgroundColor: Colors.grey[850],
           foregroundColor: Colors.white,
+          elevation: 0,
         ),
         textTheme: const TextTheme(
           bodyLarge: TextStyle(color: Colors.white),
           bodyMedium: TextStyle(color: Colors.white70),
-          titleLarge: TextStyle(color: Colors.white),
+          titleLarge: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
       ),
-      // Set the SplashScreen as the initial widget to be displayed
-      home: const SplashScreen(), // Use home property for the very first screen
+
+      home: const SplashScreen(),
+
       routes: {
-        // You might use named routes for navigation *after* the splash screen
-        '/initial':
-            (context) =>
-                const InitialPage(), // This is where the splash screen navigates
+        '/initial': (context) => const InitialPage(),
+        // Rota para a tela de login.
         '/login': (context) => const LoginScreen(),
+        // Rota para a tela de dashboard.
         '/dashboard': (context) => const TelaPrincipal(),
+        // Rota para a tela de registro.
         '/register': (context) => const RegisterScreen(),
       },
     );

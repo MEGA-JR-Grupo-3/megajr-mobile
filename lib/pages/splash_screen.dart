@@ -40,7 +40,7 @@ class _SplashScreenState extends State<SplashScreen>
         setState(() {
           _isVisible = false;
         });
-        Navigator.of(context).pushReplacementNamed('/');
+        Navigator.of(context).pushReplacementNamed('/initial');
       }
     });
   }

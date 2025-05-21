@@ -19,9 +19,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   String _errorMessage = "";
-  bool _isLoading = false; // To show loading state
-
-  // Function to check if the user exists in the backend database
+  bool _isLoading = false; 
   Future<bool> checkIfUserExists(String email) async {
     try {
       final response = await http.get(
