@@ -3,10 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'package:mobile_megajr_grupo3/components/input.dart'; // You'll need to create this file
-import 'package:mobile_megajr_grupo3/components/input_password.dart'; // You'll need to create this file
-import 'package:mobile_megajr_grupo3/components/button.dart'; // You'll need to create this file
-import 'package:mobile_megajr_grupo3/components/google_login_button.dart'; // You'll need to create this file
+import 'package:mobile_megajr_grupo3/components/input.dart';
+import 'package:mobile_megajr_grupo3/components/input_password.dart';
+import 'package:mobile_megajr_grupo3/components/button.dart';
+import 'package:mobile_megajr_grupo3/components/google_login_button.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});

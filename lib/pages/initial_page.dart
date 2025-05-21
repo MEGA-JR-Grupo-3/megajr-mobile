@@ -1,7 +1,6 @@
 // lib/pages/initial_page.dart
 import 'package:flutter/material.dart';
 import 'package:mobile_megajr_grupo3/components/button.dart';
-import 'package:mobile_megajr_grupo3/components/theme_switch.dart';
 
 class InitialPage extends StatelessWidget {
   // Or HomePage
