@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "190657188583",
+    "project_id": "autenticacao-mega",
+    "storage_bucket": "autenticacao-mega.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:190657188583:android:5c3425eaf92ad88bb14842",
+        "android_client_info": {
+          "package_name": "com.example.mobile_megajr_grupo3"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "190657188583-3rso8d97ifqfo67a1m91074g1a7t2kkt.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCTHV4z50Zmf8e0r2bWmKBXKvZS-DKUZXU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "190657188583-3rso8d97ifqfo67a1m91074g1a7t2kkt.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

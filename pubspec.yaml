@@ -1,6 +1,6 @@
 name: mobile_megajr_grupo3
 description: "A new Flutter project."
-publish_to: 'none'
+publish_to: "none"
 version: 0.1.0
 
 environment:
@@ -11,7 +11,12 @@ dependencies:
     sdk: flutter
   flutter_native_splash: ^2.4.6
   flutter_launcher_icons: "^0.14.3"
-
+  cupertino_icons: ^1.0.8
+  firebase_core: ^2.27.0 # Para inicializar o Firebase
+  firebase_auth: ^4.17.8 # Para autenticação de e-mail/senha
+  google_sign_in: ^6.2.1 # Para login com Google
+  http: ^1.2.1 # Para fazer requisições HTTP (chamadas de API)
+  provider: ^6.0.5
 
 flutter_native_splash:
   color: "#FFFFFF"
@@ -26,7 +31,6 @@ flutter_icons:
   android: "laucher_icon"
   adaptative_icon_background: "#FFFFFF"
   adaptative_icon_foreground: "assets/logo_sem_fundo.png"
-  
 
 dev_dependencies:
   flutter_test:
@@ -38,5 +42,7 @@ flutter:
 
   assets:
     - assets/pato.png
-    - assets/logo.png
-    - assets/splash.png
+    - assets/splash-pato.png
+    - assets/googleicon.svg
+    - assets/gif-pato.gif
+    - assets/pato-triste.png
