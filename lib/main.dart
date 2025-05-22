@@ -53,7 +53,10 @@ class MyApp extends StatelessWidget {
         textTheme: const TextTheme(
           bodyLarge: TextStyle(color: Colors.white),
           bodyMedium: TextStyle(color: Colors.white70),
-          titleLarge: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          titleLarge: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
         ),
       ),
 
@@ -64,7 +67,7 @@ class MyApp extends StatelessWidget {
         // Rota para a tela de login.
         '/login': (context) => const LoginScreen(),
         // Rota para a tela de dashboard.
-        '/dashboard': (context) => const TelaPrincipal(),
+        '/dashboard': (context) => const DashboardScreen(),
         // Rota para a tela de registro.
         '/register': (context) => const RegisterScreen(),
       },
