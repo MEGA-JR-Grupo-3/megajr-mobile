@@ -2,25 +2,18 @@
 import 'package:flutter/material.dart';
 
 class ThemeProvider with ChangeNotifier {
-  // Default to system theme or light theme
-  ThemeMode _themeMode = ThemeMode.system;
+  ThemeMode _themeMode = ThemeMode.system; // Ou ThemeMode.light
 
   ThemeMode get themeMode => _themeMode;
 
-  // You can implement logic to save/load theme preference (e.g., using shared_preferences)
-  // For simplicity, this example just toggles it in memory.
-
-  void toggleTheme() {
-    if (_themeMode == ThemeMode.light) {
-      _themeMode = ThemeMode.dark;
-    } else {
-      _themeMode = ThemeMode.light;
-    }
-    // Notify listeners that the theme has changed
+  // Modifique o método toggleTheme para aceitar um booleano
+  // 'isDarkMode' será true se o switch estiver ligado (indicando modo escuro)
+  void toggleTheme(bool isDarkMode) {
+    _themeMode = isDarkMode ? ThemeMode.dark : ThemeMode.light;
     notifyListeners();
   }
 
-  // Optional: Set theme explicitly
+  // Opcional: Você pode manter o 'setThemeMode' se precisar definir o tema explicitamente em outros lugares
   void setThemeMode(ThemeMode mode) {
     if (_themeMode != mode) {
       _themeMode = mode;

@@ -10,7 +10,8 @@ import 'package:mobile_megajr_grupo3/pages/initial_page.dart';
 import 'package:mobile_megajr_grupo3/pages/splash_screen.dart';
 import 'package:mobile_megajr_grupo3/providers/theme_provider.dart';
 import 'package:mobile_megajr_grupo3/services/auth_service.dart';
-import 'package:mobile_megajr_grupo3/pages/team_screen.dart'; // <--- ADD THIS IMPORT
+import 'package:mobile_megajr_grupo3/pages/team_screen.dart';
+import 'package:mobile_megajr_grupo3/theme/app_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -35,31 +36,10 @@ class MyApp extends StatelessWidget {
 
     return MaterialApp(
       title: 'Mega Jr App',
-      themeMode: themeProvider.themeMode,
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-        visualDensity: VisualDensity.adaptivePlatformDensity,
-        brightness: Brightness.light,
-      ),
-      darkTheme: ThemeData(
-        primarySwatch: Colors.blue,
-        visualDensity: VisualDensity.adaptivePlatformDensity,
-        brightness: Brightness.dark,
-        scaffoldBackgroundColor: Colors.grey[900],
-        appBarTheme: AppBarTheme(
-          backgroundColor: Colors.grey[850],
-          foregroundColor: Colors.white,
-          elevation: 0,
-        ),
-        textTheme: const TextTheme(
-          bodyLarge: TextStyle(color: Colors.white),
-          bodyMedium: TextStyle(color: Colors.white70),
-          titleLarge: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-      ),
+      themeMode: themeProvider.themeMode, // Controlado pelo ThemeProvider
+      theme: AppTheme.lightTheme, // Use o tema claro definido em app_theme.dart
+      darkTheme:
+          AppTheme.darkTheme, // Use o tema escuro definido em app_theme.dart
 
       home: const SplashScreen(),
 
