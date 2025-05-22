@@ -4,7 +4,8 @@ import 'package:google_sign_in/google_sign_in.dart'; // Importa o Google Sign-In
 
 class GoogleLoginButton extends StatelessWidget {
   final Function(User?) onSuccess;
-  final Function(dynamic)? onError; // Callback onError adicionado para tratamento de erros mais robusto
+  final Function(dynamic)?
+  onError; // Callback onError adicionado para tratamento de erros mais robusto
 
   const GoogleLoginButton({
     super.key,
@@ -27,7 +28,8 @@ class GoogleLoginButton extends StatelessWidget {
       }
 
       // 3. Obtém os detalhes de autenticação do GoogleSignInAccount
-      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      final GoogleSignInAuthentication googleAuth =
+          await googleUser.authentication;
 
       // 4. Cria uma nova credencial com o token de acesso e o token de ID
       final AuthCredential credential = GoogleAuthProvider.credential(
@@ -36,30 +38,32 @@ class GoogleLoginButton extends StatelessWidget {
       );
 
       // 5. Faz login no Firebase com a credencial do Google
-      final UserCredential userCredential = await FirebaseAuth.instance.signInWithCredential(credential);
+      final UserCredential userCredential = await FirebaseAuth.instance
+          .signInWithCredential(credential);
 
       // Chama o callback onSuccess com o usuário logado
       onSuccess(userCredential.user);
-
     } on FirebaseAuthException catch (e) {
       // Trata erros específicos do Firebase (por exemplo, account-exists-with-different-credential)
-      print("Erro de Autenticação Firebase durante o Login com Google: ${e.code} - ${e.message}");
+      print(
+        "Erro de Autenticação Firebase durante o Login com Google: ${e.code} - ${e.message}",
+      );
       if (onError != null) {
         onError!(e); // Passa a FirebaseAuthException
       }
       // Opcionalmente, mostra uma mensagem amigável ao usuário
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Falha no login: ${e.message}')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Falha no login: ${e.message}')));
     } catch (e) {
       // Trata quaisquer outros erros (por exemplo, problemas de rede, erros de configuração do Google Sign-In)
       print("Erro geral durante o Login com Google: $e");
       if (onError != null) {
         onError!(e); // Passa a exceção geral
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Ocorreu um erro inesperado: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Ocorreu um erro inesperado: $e')));
     }
   }
 
@@ -75,19 +79,26 @@ class GoogleLoginButton extends StatelessWidget {
     return ElevatedButton(
       onPressed: () => _signInWithGoogle(context),
       style: ElevatedButton.styleFrom(
-        padding: EdgeInsets.zero, // Remove o preenchimento padrão para permitir que o Ink ocupe todo o espaço
+        padding:
+            EdgeInsets
+                .zero, // Remove o preenchimento padrão para permitir que o Ink ocupe todo o espaço
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(40.0), // Equivalente a rounded-4xl (CSS)
+          borderRadius: BorderRadius.circular(
+            40.0,
+          ), // Equivalente a rounded-4xl (CSS)
         ),
         elevation: 0, // Remove a elevação padrão
-        backgroundColor: Colors.transparent, // Torna o botão transparente para mostrar o gradiente
+        backgroundColor:
+            Colors
+                .transparent, // Torna o botão transparente para mostrar o gradiente
         shadowColor: Colors.transparent, // Remove a sombra
       ),
       child: Ink(
         decoration: BoxDecoration(
           gradient: const RadialGradient(
             center: Alignment.center, // circle_at_center
-            radius: 0.7, // Ajuste conforme necessário para obter um efeito semelhante a 70% em CSS
+            radius:
+                0.7, // Ajuste conforme necessário para obter um efeito semelhante a 70% em CSS
             colors: [
               primaryColor, // var(--primary) (CSS)
               secondaryColor, // var(--secondary) (CSS)
@@ -98,7 +109,10 @@ class GoogleLoginButton extends StatelessWidget {
         child: Container(
           width: 312.0, // w-[312px] (CSS/Tailwind)
           alignment: Alignment.center,
-          padding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 24.0), // p-2 (CSS/Tailwind)
+          padding: const EdgeInsets.symmetric(
+            vertical: 16.0,
+            horizontal: 24.0,
+          ), // p-2 (CSS/Tailwind)
           child: Row(
             mainAxisSize: MainAxisSize.min, // Mantém o conteúdo compacto
             children: [
@@ -107,7 +121,9 @@ class GoogleLoginButton extends StatelessWidget {
                 height: 24,
                 width: 24,
               ),
-              const SizedBox(width: 10), // espaçamento (similar a absolute left-[10px] em CSS/Tailwind)
+              const SizedBox(
+                width: 10,
+              ), // espaçamento (similar a absolute left-[10px] em CSS/Tailwind)
               const Text(
                 "Entre com sua conta Google",
                 style: TextStyle(

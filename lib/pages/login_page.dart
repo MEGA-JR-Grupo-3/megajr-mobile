@@ -7,6 +7,7 @@ import 'package:mobile_megajr_grupo3/components/input.dart';
 import 'package:mobile_megajr_grupo3/components/input_password.dart';
 import 'package:mobile_megajr_grupo3/components/button.dart';
 import 'package:mobile_megajr_grupo3/components/google_login_button.dart';
+import '../services/auth_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -19,7 +20,9 @@ class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   String _errorMessage = "";
-  bool _isLoading = false; 
+  bool _isLoading = false;
+  final AuthService _authService = AuthService(); // Instancie o AuthService
+
   Future<bool> checkIfUserExists(String email) async {
     try {
       final response = await http.get(
@@ -34,6 +37,7 @@ class _LoginScreenState extends State<LoginScreen> {
         return false;
       }
     } catch (error) {
+      print("Erro ao verificar se usuário existe no backend: $error");
       return false;
     }
   }
@@ -48,8 +52,6 @@ class _LoginScreenState extends State<LoginScreen> {
     try {
       final String email = _emailController.text.trim();
       final String password = _passwordController.text.trim();
-
-      // Check if user exists in the backend
       final bool userExists = await checkIfUserExists(email);
       if (!userExists) {
         setState(() {
@@ -60,17 +62,10 @@ class _LoginScreenState extends State<LoginScreen> {
       }
 
       // If user exists, proceed with Firebase login
-      UserCredential userCredential = await FirebaseAuth.instance
-          .signInWithEmailAndPassword(email: email, password: password);
+      UserCredential userCredential = await _authService
+          .signInWithEmailAndPassword(email, password);
 
       if (userCredential.user != null) {
-        // In Flutter, you don't typically store auth tokens in localStorage like web.
-        // Firebase handles session management internally.
-        // If you need the token for your backend, you can get it:
-        // String? token = await userCredential.user!.getIdToken();
-        // print('Firebase Auth Token: $token');
-
-        // Navigate to dashboard
         Navigator.of(context).pushReplacementNamed('/dashboard');
       }
     } on FirebaseAuthException catch (e) {
@@ -81,6 +76,8 @@ class _LoginScreenState extends State<LoginScreen> {
         message = 'Senha incorreta fornecida para esse usuário.';
       } else if (e.code == 'invalid-email') {
         message = 'O formato do e-mail é inválido.';
+      } else if (e.code == 'too-many-requests') {
+        message = 'Muitas tentativas de login. Tente novamente mais tarde.';
       } else {
         message = 'Erro ao fazer login. Verifique seu e-mail e senha.';
       }
@@ -88,13 +85,11 @@ class _LoginScreenState extends State<LoginScreen> {
         _errorMessage = message;
         _isLoading = false;
       });
-      print("Erro de autenticação Firebase: ${e.code} - ${e.message}");
     } catch (error) {
       setState(() {
         _errorMessage = "Erro inesperado ao fazer login.";
         _isLoading = false;
       });
-      print("Erro ao fazer login: $error");
     } finally {
       setState(() {
         _isLoading = false;
@@ -102,8 +97,8 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  // Function to handle Google login success (placeholder)
-  Future<void> _handleGoogleLoginSuccess(User? user) async {
+  // Função para lidar com o resultado do login com Google (sucesso ou falha)
+  Future<void> _handleGoogleLoginResult(User? user, Object? error) async {
     if (user != null) {
       print("Login com Google Sucesso: ${user.displayName}");
       // You'll need to implement actual Google Sign-In for Flutter.
@@ -119,23 +114,52 @@ class _LoginScreenState extends State<LoginScreen> {
           body: json.encode({'name': userName, 'email': userEmail}),
         );
 
-        if (response.statusCode == 200) {
+        if (response.statusCode == 200 || response.statusCode == 201) {
+          // 200 OK ou 201 Created
           print("Dados do usuário do Google enviados ao backend com sucesso.");
           Navigator.of(context).pushReplacementNamed('/dashboard');
         } else {
+          // O login Firebase foi bem-sucedido, mas o backend teve um problema.
+          // Decide se navega ou mostra um aviso.
           print(
-            "Erro na resposta do backend ao comunicar dados do Google: ${response.statusCode}",
+            "Erro na resposta do backend ao comunicar dados do Google: ${response.statusCode} - ${response.body}",
           );
-          // Still navigate to dashboard even if backend call fails,
-          // as Firebase auth was successful. Handle backend errors gracefully.
+          // Opcional: mostrar um aviso ao usuário sobre o erro no backend, mas ainda navegar.
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Login bem-sucedido, mas houve um problema com nosso serviço.',
+              ),
+            ),
+          );
           Navigator.of(context).pushReplacementNamed('/dashboard');
         }
-      } catch (error) {
+      } catch (e) {
         print(
-          "Erro ao fazer requisição para cadastro/verificação do Google (CATCH): $error",
+          "Erro ao fazer requisição para cadastro/verificação do Google (CATCH): $e",
+        );
+        // Opcional: mostrar um aviso ao usuário
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Login bem-sucedido, mas houve um problema de comunicação.',
+            ),
+          ),
         );
         Navigator.of(context).pushReplacementNamed('/dashboard');
+      } finally {
+        setState(() {
+          _isLoading = false;
+        });
       }
+    } else {
+      // Usuário nulo ou houve um erro no login do Google no GoogleLoginButton
+      print("Erro ou cancelamento do login com Google: $error");
+      setState(() {
+        _errorMessage =
+            error.toString(); // Exibe o erro do callback do GoogleLoginButton
+        _isLoading = false;
+      });
     }
   }
 
@@ -229,73 +253,66 @@ class _LoginScreenState extends State<LoginScreen> {
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              const SizedBox(height: 60), // Add some top padding
+              const SizedBox(height: 60),
               const Text(
                 "Jubileu está esperando sua próxima tarefa!",
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 32,
                   fontWeight: FontWeight.w700,
-                  color: Colors.black, // Or your app's primary text color
+                  color: Colors.black,
                 ),
               ),
-              const SizedBox(height: 80), // Gap between title and image/form
-              // Image (PatoImg) - In Flutter, you use AssetImage or NetworkImage
-              // For a local asset, make sure 'assets/splash-pato.png' is added to pubspec.yaml
+              const SizedBox(height: 80),
               Image.asset(
-                'assets/splash-pato.png', // Make sure this asset is in your pubspec.yaml
+                'assets/splash-pato.png',
                 height: 200,
                 fit: BoxFit.contain,
               ),
-              const SizedBox(height: 80), // Gap between image and form
+              const SizedBox(height: 80),
 
               Form(
                 child: Column(
                   children: [
                     CustomInput(
-                      // Using CustomInput from your components
                       controller: _emailController,
                       labelText: "E-mail",
                       hintText: "seu@email.com",
                       keyboardType: TextInputType.emailAddress,
                       onChanged: (value) {
-                        setState(() {}); // Rebuild to update button state
+                        setState(() {});
                       },
                     ),
-                    const SizedBox(height: 16), // Spacing between inputs
+                    const SizedBox(height: 16),
                     CustomInputPassword(
-                      // Using CustomInputPassword from your components
                       controller: _passwordController,
                       labelText: "Senha",
                       hintText: "sua senha",
                       onChanged: (value) {
-                        setState(() {}); // Rebuild to update button state
+                        setState(() {});
                       },
                     ),
-                    const SizedBox(height: 25), // Spacing before button
+                    const SizedBox(height: 25),
                     CustomButton(
-                      // Using CustomButton from your components
                       buttonText: _isLoading ? "Entrando..." : "Entrar",
                       onPressed:
                           (_emailController.text.trim().isNotEmpty &&
                                   _passwordController.text.trim().isNotEmpty &&
                                   !_isLoading)
                               ? _handleFormSubmit
-                              : null, // Disable button if fields are empty or loading
+                              : null,
                       buttonStyle: ButtonStyle(
                         backgroundColor: WidgetStateProperty.resolveWith<Color>(
                           (Set<WidgetState> states) {
                             if (states.contains(WidgetState.disabled)) {
-                              return Colors.grey; // Disabled color
+                              return Colors.grey;
                             }
-                            return const Color(0xFF5C2A84); // Enabled color
+                            return const Color(0xFF5C2A84);
                           },
                         ),
                         shape: WidgetStateProperty.all<RoundedRectangleBorder>(
                           RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(
-                              8.0,
-                            ), // Rounded corners
+                            borderRadius: BorderRadius.circular(8.0),
                           ),
                         ),
                         padding: WidgetStateProperty.all<EdgeInsetsGeometry>(
@@ -309,12 +326,18 @@ class _LoginScreenState extends State<LoginScreen> {
                   ],
                 ),
               ),
-              const SizedBox(height: 20), // Spacing after email/password button
+              const SizedBox(height: 20),
               GoogleLoginButton(
-                // Using GoogleLoginButton from your components
-                onSuccess: _handleGoogleLoginSuccess,
+                onSuccess: (user) {
+                  // Passa o usuário para a função de tratamento de resultado
+                  _handleGoogleLoginResult(user, null);
+                },
+                onError: (error) {
+                  // Passa o erro para a função de tratamento de resultado
+                  _handleGoogleLoginResult(null, error);
+                },
               ),
-              const SizedBox(height: 20), // Spacing after Google button
+              const SizedBox(height: 20),
               TextButton(
                 onPressed: () {
                   Navigator.of(context).pushNamed('/register');

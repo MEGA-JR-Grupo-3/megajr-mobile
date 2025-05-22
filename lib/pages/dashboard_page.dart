@@ -83,7 +83,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       }
     } catch (e) {
       if (mounted) {
-         _showErrorDialog("Erro ao buscar tarefas: $e");
+        _showErrorDialog("Erro ao buscar tarefas: $e");
         _filteredTasks = []; // Clear tasks on error
       }
     } finally {
@@ -105,7 +105,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
     if (mounted) setState(() => _isLoadingTasks = true);
     try {
       // Pass current user's email if your backend search is user-specific
-      final tasks = await _apiService.searchTasks(searchTerm, _currentUser!.email!);
+      final tasks = await _apiService.searchTasks(
+        searchTerm,
+        _currentUser!.email!,
+      );
       if (mounted) {
         setState(() {
           _filteredTasks = tasks;
@@ -151,7 +154,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         });
       }
     } catch (e) {
-       if (mounted) _showErrorDialog("Erro ao deletar tarefa: $e");
+      if (mounted) _showErrorDialog("Erro ao deletar tarefa: $e");
     }
   }
 
@@ -183,8 +186,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
       });
       // Persist the new order to the backend
       if (_currentUser?.email != null) {
-        _apiService.updateTaskOrder(_filteredTasks, _currentUser!.email!)
-          .catchError((e) => _showErrorDialog("Erro ao salvar nova ordem: $e"));
+        _apiService
+            .updateTaskOrder(_filteredTasks, _currentUser!.email!)
+            .catchError(
+              (e) => _showErrorDialog("Erro ao salvar nova ordem: $e"),
+            );
       }
     }
   }
@@ -194,7 +200,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
       context: context,
       builder: (BuildContext context) {
         return AddTaskFormWidget(
-          onTaskAdded: (newTask) { // Expecting the form to return the newly created task
+          onTaskAdded: (newTask) {
+            // Expecting the form to return the newly created task
             _onTaskAdded(newTask);
           },
           userEmail: _currentUser!.email!, // Pass userEmail to the form
@@ -208,11 +215,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
     // If there's already an error dialog, don't show another one
     // This simple check might need refinement for complex scenarios
     if (ModalRoute.of(context)?.isCurrent != true) {
-        // If a dialog is already open, perhaps log or use a SnackBar
-        ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(message, style: const TextStyle(color: Colors.white)), backgroundColor: Colors.redAccent)
-        );
-        return;
+      // If a dialog is already open, perhaps log or use a SnackBar
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message, style: const TextStyle(color: Colors.white)),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+      return;
     }
 
     showDialog(
@@ -227,9 +237,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
               onPressed: () {
                 Navigator.of(context).pop();
                 if (mounted) {
-                    setState(() {
-                        _errorMessage = null; // Clear the page-level error message if any
-                    });
+                  setState(() {
+                    _errorMessage =
+                        null; // Clear the page-level error message if any
+                  });
                 }
               },
             ),
@@ -238,7 +249,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
       },
     );
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -252,86 +262,110 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     final screenWidth = MediaQuery.of(context).size.width;
     int crossAxisCount = 1;
-    if (screenWidth > 1024) { // lg
+    if (screenWidth > 1024) {
+      // lg
       crossAxisCount = 3;
-    } else if (screenWidth > 640) { // sm
+    } else if (screenWidth > 640) {
+      // sm
       crossAxisCount = 2;
     }
-    double childAspectRatio = screenWidth / (crossAxisCount * 350); // Adjust 350 based on desired card height
-
+    double childAspectRatio =
+        screenWidth /
+        (crossAxisCount * 350); // Adjust 350 based on desired card height
 
     return Scaffold(
       // Using a GlobalKey for the Scaffold to open the drawer programmatically
       key: _scaffoldKey,
       appBar: AppBar(
         // Show menu icon to open drawer only on smaller screens
-        leading: (screenWidth < 1024) // 'lg' breakpoint in Tailwind
-            ? IconButton(
-                icon: const Icon(Icons.menu),
-                onPressed: () => _scaffoldKey.currentState?.openDrawer(),
-              )
-            : null, // No leading icon on larger screens if sidebar is always visible or different trigger
+        leading:
+            (screenWidth < 1024) // 'lg' breakpoint in Tailwind
+                ? IconButton(
+                  icon: const Icon(Icons.menu),
+                  onPressed: () => _scaffoldKey.currentState?.openDrawer(),
+                )
+                : null, // No leading icon on larger screens if sidebar is always visible or different trigger
         title: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             if (screenWidth < 1024) // lg:hidden
-              Image.asset('assets/splash-pato.png', height: 30, fit: BoxFit.contain),
+              Image.asset(
+                'assets/splash-pato.png',
+                height: 30,
+                fit: BoxFit.contain,
+              ),
             if (screenWidth < 1024) // lg:hidden
               const SizedBox(width: 8),
             if (screenWidth < 1024) // lg:hidden
               Expanded(
                 child: Text(
                   'Olá, ${_registeredName.isNotEmpty ? _registeredName : _currentUser?.displayName ?? "parceiro(a)!"}',
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
           ],
         ),
         // On larger screens, the title might be different or not needed if sidebar is persistent
-        centerTitle: (screenWidth < 1024) ? false : true, // Adjust as per your design
+        centerTitle:
+            (screenWidth < 1024) ? false : true, // Adjust as per your design
         actions: [
           // If sidebar is not persistent on large screens, add a button for it here too
           // or handle it differently.
-           if (screenWidth >= 1024)
+          if (screenWidth >= 1024)
             Padding(
               padding: const EdgeInsets.only(right: 16.0),
               child: Text(
-                 'Olá, ${_registeredName.isNotEmpty ? _registeredName : _currentUser?.displayName ?? "parceiro(a)!"}',
+                'Olá, ${_registeredName.isNotEmpty ? _registeredName : _currentUser?.displayName ?? "parceiro(a)!"}',
                 style: const TextStyle(fontSize: 18),
               ),
             ),
-            if (screenWidth >= 1024)
-             IconButton(
-                icon: const Icon(Icons.logout),
-                onPressed: () async {
-                  await _authService.signOut();
-                  if (mounted) Navigator.of(context).pushReplacementNamed('/login');
-                },
-              ),
+          if (screenWidth >= 1024)
+            IconButton(
+              icon: const Icon(Icons.logout),
+              onPressed: () async {
+                await _authService.signOut();
+                if (mounted)
+                  Navigator.of(context).pushReplacementNamed('/login');
+              },
+            ),
         ],
       ),
       // Sidebar (Drawer)
-      drawer: (screenWidth < 1024) ? SidebarDrawer(
-        userName: _registeredName.isNotEmpty ? _registeredName : _currentUser?.displayName ?? "Usuário",
-        userEmail: _currentUser?.email ?? "Não logado",
-        onLogout: () async {
-          Navigator.of(context).pop(); // Close drawer first
-          await _authService.signOut();
-          if (mounted) Navigator.of(context).pushReplacementNamed('/login');
-        },
-      ) : null, // No drawer if sidebar is part of the main layout on large screens
+      drawer:
+          (screenWidth < 1024)
+              ? SidebarDrawer(
+                userName:
+                    _registeredName.isNotEmpty
+                        ? _registeredName
+                        : _currentUser?.displayName ?? "Usuário",
+                userEmail: _currentUser?.email ?? "Não logado",
+                onLogout: () async {
+                  Navigator.of(context).pop(); // Close drawer first
+                  await _authService.signOut();
+                  if (mounted)
+                    Navigator.of(context).pushReplacementNamed('/login');
+                },
+              )
+              : null, // No drawer if sidebar is part of the main layout on large screens
 
       body: Row(
         children: [
           // Persistent Sidebar for large screens
           if (screenWidth >= 1024) // 'lg' breakpoint
             SidebarDrawer(
-              userName: _registeredName.isNotEmpty ? _registeredName : _currentUser?.displayName ?? "Usuário",
+              userName:
+                  _registeredName.isNotEmpty
+                      ? _registeredName
+                      : _currentUser?.displayName ?? "Usuário",
               userEmail: _currentUser?.email ?? "Não logado",
               onLogout: () async {
                 await _authService.signOut();
-                if (mounted) Navigator.of(context).pushReplacementNamed('/login');
+                if (mounted)
+                  Navigator.of(context).pushReplacementNamed('/login');
               },
             ),
 
@@ -356,52 +390,65 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   if (_isLoadingTasks)
                     const Expanded(
                       child: Center(
-                        child: SpinKitFadingCircle(color: Colors.grey, size: 40.0),
+                        child: SpinKitFadingCircle(
+                          color: Colors.grey,
+                          size: 40.0,
+                        ),
                       ),
                     )
                   else if (_errorMessage != null && _filteredTasks.isEmpty)
-                     Expanded(
-                        child: Center(
+                    Expanded(
+                      child: Center(
                         child: Padding(
-                            padding: const EdgeInsets.all(16.0),
-                            child: Column(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                                Text(
+                              Text(
                                 _errorMessage!,
-                                style: TextStyle(fontSize: 18, color: Colors.grey[700]),
-                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  color: Colors.grey[700],
                                 ),
-                                const SizedBox(height: 20),
-                                ElevatedButton(
+                                textAlign: TextAlign.center,
+                              ),
+                              const SizedBox(height: 20),
+                              ElevatedButton(
                                 onPressed: () {
-                                    _searchController.clear();
-                                    _handleSearch(""); // Clear search and fetch all
+                                  _searchController.clear();
+                                  _handleSearch(
+                                    "",
+                                  ); // Clear search and fetch all
                                 },
                                 child: const Text("Limpar Busca"),
-                                )
+                              ),
                             ],
-                            ),
+                          ),
                         ),
-                        ),
+                      ),
                     )
                   else if (_filteredTasks.isEmpty)
                     Expanded(
                       child: Center(
                         child: Padding(
-                          padding: const EdgeInsets.all(16.0), // For overall padding
+                          padding: const EdgeInsets.all(
+                            16.0,
+                          ), // For overall padding
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Text(
                                 "Bora organizar sua vida!",
-                                style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 20),
+                                style: Theme.of(
+                                  context,
+                                ).textTheme.titleLarge?.copyWith(fontSize: 20),
                                 textAlign: TextAlign.center,
                               ),
                               const SizedBox(height: 30), // gap-14 approx
                               Image.asset(
                                 'assets/pato-triste.png',
-                                width: 180, // Adjusted from 250 for typical mobile view
+                                width:
+                                    180, // Adjusted from 250 for typical mobile view
                                 height: 180,
                                 fit: BoxFit.contain,
                               ),
@@ -413,21 +460,28 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   else
                     Expanded(
                       child: ReorderableGridView.builder(
-                        padding: const EdgeInsets.symmetric(horizontal: 4.0, vertical: 15.0), // px-4 mt-[30px]
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 4.0,
+                          vertical: 15.0,
+                        ), // px-4 mt-[30px]
                         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                           crossAxisCount: crossAxisCount,
-                          childAspectRatio: childAspectRatio, // Adjust for card aspect ratio
+                          childAspectRatio:
+                              childAspectRatio, // Adjust for card aspect ratio
                           crossAxisSpacing: 16, // gap-4
-                          mainAxisSpacing: 16,  // gap-4
+                          mainAxisSpacing: 16, // gap-4
                         ),
                         itemCount: _filteredTasks.length,
                         itemBuilder: (context, index) {
                           final task = _filteredTasks[index];
                           return TaskCardWidget(
-                            key: ValueKey(task.idTarefa), // Important for reordering
+                            key: ValueKey(
+                              task.idTarefa,
+                            ), // Important for reordering
                             task: task,
                             onTaskDeleted: () => _onTaskDeleted(task.idTarefa),
-                            onTaskUpdated: (updatedTask) => _onTaskUpdated(updatedTask),
+                            onTaskUpdated:
+                                (updatedTask) => _onTaskUpdated(updatedTask),
                             // isDraggable is inherent with ReorderableGridView
                           );
                         },
@@ -448,7 +502,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ),
     );
   }
-  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>(); // For opening drawer
+
+  final GlobalKey<ScaffoldState> _scaffoldKey =
+      GlobalKey<ScaffoldState>(); // For opening drawer
 
   @override
   void dispose() {
