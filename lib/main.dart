@@ -10,6 +10,7 @@ import 'package:mobile_megajr_grupo3/pages/initial_page.dart';
 import 'package:mobile_megajr_grupo3/pages/splash_screen.dart';
 import 'package:mobile_megajr_grupo3/providers/theme_provider.dart';
 import 'package:mobile_megajr_grupo3/services/auth_service.dart';
+import 'package:mobile_megajr_grupo3/pages/team_screen.dart'; // <--- ADD THIS IMPORT
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -61,12 +62,10 @@ class MyApp extends StatelessWidget {
 
       routes: {
         '/initial': (context) => const InitialPage(),
-        // Rota para a tela de login.
         '/login': (context) => const LoginScreen(),
-        // Rota para a tela de dashboard.
         '/dashboard': (context) => const DashboardScreen(),
-        // Rota para a tela de registro.
         '/register': (context) => const RegisterScreen(),
+        '/team': (context) => const TeamScreen(),
       },
     );
   }

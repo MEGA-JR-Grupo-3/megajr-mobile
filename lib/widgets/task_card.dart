@@ -6,11 +6,11 @@ import 'add_task_form.dart';
 // Helper to get color based on priority
 Color _getPriorityColor(String priority) {
   switch (priority.toLowerCase()) {
-    case 'urgente': // Changed to lowercase for consistency
+    case 'Urgente':
       return Colors.red.shade300;
     case 'alta':
       return Colors.orange.shade300;
-    case 'média':
+    case 'média': // Corrected from 'media'
       return Colors.yellow.shade300;
     case 'baixa':
       return Colors.blue.shade300;

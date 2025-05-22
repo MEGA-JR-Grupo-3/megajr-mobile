@@ -29,10 +29,14 @@ class SidebarDrawer extends StatelessWidget {
             ),
             accountEmail: Text(userEmail),
             currentAccountPicture: CircleAvatar(
-              backgroundColor: Colors.white, // Or use an Image.asset for a profile picture
+              backgroundColor:
+                  Colors.white, // Or use an Image.asset for a profile picture
               child: Text(
                 userName.isNotEmpty ? userName[0].toUpperCase() : "U",
-                style: const TextStyle(fontSize: 40.0, color: Colors.deepPurple),
+                style: const TextStyle(
+                  fontSize: 40.0,
+                  color: Colors.deepPurple,
+                ),
               ),
             ),
             decoration: BoxDecoration(
@@ -48,19 +52,47 @@ class SidebarDrawer extends StatelessWidget {
             },
           ),
           ListTile(
+            leading: const Icon(Icons.edit),
+            title: const Text('Editar Perfil'),
+            onTap: () {
+              Navigator.pop(context);
+            },
+          ),
+          ListTile(
             leading: const Icon(Icons.settings_outlined),
             title: const Text('Configurações'),
             onTap: () {
               Navigator.pop(context);
               // TODO: Navigate to Settings Screen
               ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text("Configurações (Não implementado)")));
+                const SnackBar(
+                  content: Text("Configurações (Não implementado)"),
+                ),
+              );
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.info),
+            title: const Text('Quem Somos'),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.pushNamed(context, '/team');
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.help),
+            title: const Text('Ajuda'),
+            onTap: () {
+              Navigator.pop(context);
             },
           ),
           const Divider(),
           ListTile(
             leading: const Icon(Icons.exit_to_app, color: Colors.redAccent),
-            title: const Text('Sair', style: TextStyle(color: Colors.redAccent)),
+            title: const Text(
+              'Sair',
+              style: TextStyle(color: Colors.redAccent),
+            ),
             onTap: onLogout,
           ),
         ],
