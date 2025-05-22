@@ -2,7 +2,8 @@
     <application
         android:label="JubiTasks"
         android:name="${applicationName}"
-        android:icon="@mipmap/laucher_icon">
+        android:icon="@mipmap/laucher_icon"
+        android:enableOnBackInvokedCallback="true">
         <activity
             android:name=".MainActivity"
             android:exported="true"

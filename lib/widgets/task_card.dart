@@ -6,12 +6,14 @@ import 'add_task_form.dart';
 // Helper to get color based on priority
 Color _getPriorityColor(String priority) {
   switch (priority.toLowerCase()) {
-    case 'alta':
+    case 'urgente': // Changed to lowercase for consistency
       return Colors.red.shade300;
-    case 'média': // Corrected from 'media'
+    case 'alta':
       return Colors.orange.shade300;
+    case 'média':
+      return Colors.yellow.shade300;
     case 'baixa':
-      return Colors.green.shade300;
+      return Colors.blue.shade300;
     default:
       return Colors.grey.shade300;
   }
@@ -31,7 +33,6 @@ IconData _getStatusIcon(String status) {
   }
 }
 
-
 class TaskCardWidget extends StatelessWidget {
   final Task task;
   final VoidCallback onTaskDeleted;
@@ -50,8 +51,10 @@ class TaskCardWidget extends StatelessWidget {
       builder: (BuildContext context) {
         // Assuming AddTaskFormWidget can also handle editing if an existing task is passed
         return AddTaskFormWidget(
-          userEmail: "dummy@example.com", // This needs to be passed correctly if needed by the form
-          onTaskAdded: (updatedTask) { // Renaming for clarity, it's an update here
+          userEmail:
+              "dummy@example.com", // This needs to be passed correctly if needed by the form
+          onTaskAdded: (updatedTask) {
+            // Renaming for clarity, it's an update here
             onTaskUpdated(updatedTask);
           },
           existingTask: task, // Pass the current task to prefill the form
@@ -59,7 +62,6 @@ class TaskCardWidget extends StatelessWidget {
       },
     );
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -81,8 +83,11 @@ class TaskCardWidget extends StatelessWidget {
           // Gradient or solid color based on your design
           // border: Border.all(color: Colors.grey.shade300),
           color: Colors.white, // Base color of the card
-           border: Border(
-            left: BorderSide(color: _getPriorityColor(task.prioridade), width: 5),
+          border: Border(
+            left: BorderSide(
+              color: _getPriorityColor(task.prioridade),
+              width: 5,
+            ),
           ),
         ),
         child: Column(
@@ -112,36 +117,55 @@ class TaskCardWidget extends StatelessWidget {
                       // Show confirmation dialog before deleting
                       showDialog(
                         context: context,
-                        builder: (ctx) => AlertDialog(
-                          title: const Text('Confirmar Exclusão'),
-                          content: Text('Tem certeza que deseja excluir a tarefa "${task.titulo}"?'),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.of(ctx).pop(),
-                              child: const Text('Cancelar'),
+                        builder:
+                            (ctx) => AlertDialog(
+                              title: const Text('Confirmar Exclusão'),
+                              content: Text(
+                                'Tem certeza que deseja excluir a tarefa "${task.titulo}"?',
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.of(ctx).pop(),
+                                  child: const Text('Cancelar'),
+                                ),
+                                TextButton(
+                                  onPressed: () {
+                                    Navigator.of(ctx).pop();
+                                    onTaskDeleted();
+                                  },
+                                  child: const Text(
+                                    'Excluir',
+                                    style: TextStyle(color: Colors.red),
+                                  ),
+                                ),
+                              ],
                             ),
-                            TextButton(
-                              onPressed: () {
-                                Navigator.of(ctx).pop();
-                                onTaskDeleted();
-                              },
-                              child: const Text('Excluir', style: TextStyle(color: Colors.red)),
-                            ),
-                          ],
-                        ),
                       );
                     }
                   },
-                  itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
-                    const PopupMenuItem<String>(
-                      value: 'edit',
-                      child: ListTile(leading: Icon(Icons.edit_outlined), title: Text('Editar')),
-                    ),
-                    const PopupMenuItem<String>(
-                      value: 'delete',
-                      child: ListTile(leading: Icon(Icons.delete_outline, color: Colors.redAccent), title: Text('Excluir', style: TextStyle(color: Colors.redAccent))),
-                    ),
-                  ],
+                  itemBuilder:
+                      (BuildContext context) => <PopupMenuEntry<String>>[
+                        const PopupMenuItem<String>(
+                          value: 'edit',
+                          child: ListTile(
+                            leading: Icon(Icons.edit_outlined),
+                            title: Text('Editar'),
+                          ),
+                        ),
+                        const PopupMenuItem<String>(
+                          value: 'delete',
+                          child: ListTile(
+                            leading: Icon(
+                              Icons.delete_outline,
+                              color: Colors.redAccent,
+                            ),
+                            title: Text(
+                              'Excluir',
+                              style: TextStyle(color: Colors.redAccent),
+                            ),
+                          ),
+                        ),
+                      ],
                 ),
               ],
             ),
@@ -149,26 +173,46 @@ class TaskCardWidget extends StatelessWidget {
             if (task.descricao.isNotEmpty)
               Text(
                 task.descricao,
-                style: TextStyle(fontSize: 14.0, color: textColor.withOpacity(0.8)),
+                style: TextStyle(
+                  fontSize: 14.0,
+                  color: textColor.withOpacity(0.8),
+                ),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
             const SizedBox(height: 10.0),
             Row(
               children: [
-                Icon(_getStatusIcon(task.status), size: 18, color: textColor.withOpacity(0.7)),
+                Icon(
+                  _getStatusIcon(task.status),
+                  size: 18,
+                  color: textColor.withOpacity(0.7),
+                ),
                 const SizedBox(width: 4),
-                Text(task.status, style: TextStyle(fontSize: 13, color: textColor.withOpacity(0.7))),
+                Text(
+                  task.status,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: textColor.withOpacity(0.7),
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 6.0),
             Row(
               children: [
-                Icon(Icons.calendar_today_outlined, size: 16, color: textColor.withOpacity(0.7)),
+                Icon(
+                  Icons.calendar_today_outlined,
+                  size: 16,
+                  color: textColor.withOpacity(0.7),
+                ),
                 const SizedBox(width: 4),
                 Text(
                   'Concluir até: ${task.dataConclusao}', // Format date if needed
-                  style: TextStyle(fontSize: 13.0, color: textColor.withOpacity(0.7)),
+                  style: TextStyle(
+                    fontSize: 13.0,
+                    color: textColor.withOpacity(0.7),
+                  ),
                 ),
               ],
             ),
@@ -182,7 +226,9 @@ class TaskCardWidget extends StatelessWidget {
               child: Text(
                 task.prioridade,
                 style: TextStyle(
-                  color: _getPriorityColor(task.prioridade).darken(0.3), // Make text darker for better contrast
+                  color: _getPriorityColor(
+                    task.prioridade,
+                  ).darken(0.3), // Make text darker for better contrast
                   fontWeight: FontWeight.w500,
                   fontSize: 12,
                 ),

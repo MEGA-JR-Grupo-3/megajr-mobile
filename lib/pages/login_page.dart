@@ -100,11 +100,10 @@ class _LoginScreenState extends State<LoginScreen> {
   // Função para lidar com o resultado do login com Google (sucesso ou falha)
   Future<void> _handleGoogleLoginResult(User? user, Object? error) async {
     if (user != null) {
-      setState(() {
-        _isLoading = true; // Mostra loading enquanto envia para o backend
-      });
-      print("Login com Google Sucesso: ${user.displayName} (${user.email})");
+      print("Login com Google Sucesso: ${user.displayName}");
+      // You'll need to implement actual Google Sign-In for Flutter.
 
+      // Example of sending user data to your backend after Google login
       final userName = user.displayName;
       final userEmail = user.email;
 
