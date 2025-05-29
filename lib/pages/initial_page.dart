@@ -1,81 +1,77 @@
-// lib/pages/initial_page.dart
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart'; // Importe o provider
-import 'package:mobile_megajr_grupo3/components/button.dart';
-import 'package:mobile_megajr_grupo3/providers/theme_provider.dart'; // Importe seu ThemeProvider
-import 'package:mobile_megajr_grupo3/theme/custom_colors.dart'; // Importe suas cores personalizadas
+import 'package:mobile_megajr_grupo3/widgets/custom_button.dart'; // Ajuste o caminho conforme necessário
+import 'package:mobile_megajr_grupo3/widgets/theme_switch.dart'; // Ajuste o caminho conforme necessário
 
 class InitialPage extends StatelessWidget {
   const InitialPage({super.key});
 
   @override
   Widget build(BuildContext context) {
-    // Acesse o ThemeProvider para controlar o tema
-    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
-    // Acesse o ThemeData atual para estilos padrões
-    final theme = Theme.of(context);
-    // Acesse suas cores personalizadas
-    final customColors = CustomAppColors.of(context);
-
     return Scaffold(
-      // A cor de fundo do Scaffold virá de theme.scaffoldBackgroundColor,
-      // que você já configurou em app_theme.dart
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Align(
-                alignment: Alignment.topRight,
-                child: Padding(
-                  padding: const EdgeInsets.only(top: 20, right: 20),
-                  child: Switch(
-                    value: theme.brightness == Brightness.dark,
-                    onChanged: (bool value) {
-                      themeProvider.toggleTheme(value);
-                    },
-                    activeColor: customColors.primary,
-                  ),
+      backgroundColor:
+          Theme.of(
+            context,
+          ).colorScheme.background, // Usa a cor de fundo do tema
+      body: Stack(
+        // Usamos Stack para posicionar o ThemeSwitch
+        children: [
+          Center(
+            child: SingleChildScrollView(
+              // Permite rolagem em telas menores
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    // Imagem do Pato
+                    Image.asset(
+                      'assets/splash-pato.png', // Verifique este caminho no seu pubspec.yaml
+                      height: 200,
+                      width: 200, // Você pode ajustar a largura se precisar
+                      fit: BoxFit.cover,
+                    ),
+                    const SizedBox(
+                      height: 50,
+                    ), // Espaço entre imagem e texto/botões
+                    Text(
+                      'Já é parceiro do Jubileu?',
+                      style: Theme.of(
+                        context,
+                      ).textTheme.headlineSmall!.copyWith(
+                        color: Theme.of(context).colorScheme.onBackground,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 58), // Espaço similar ao pb-[58px]
+                    // Botão "Fazer Login"
+                    CustomButton(
+                      buttonText: 'Fazer Login',
+                      onClick: () {
+                        Navigator.of(context).pushNamed('/login');
+                      },
+                    ),
+                    const SizedBox(height: 40), // Espaço similar ao mb-[40px]
+                    // Botão "Cadastrar-se"
+                    CustomButton(
+                      buttonText: 'Cadastrar-se',
+                      onClick: () {
+                        Navigator.of(context).pushNamed('/register');
+                      },
+                    ),
+                  ],
                 ),
               ),
-              const Spacer(),
-              Image.asset(
-                'assets/splash-pato.png',
-                height: 200,
-                fit: BoxFit.cover,
-              ),
-              const SizedBox(height: 80),
-              Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Text(
-                    "Já é parceiro do Jubileu?",
-                    textAlign: TextAlign.center,
-                    style: theme.textTheme.titleLarge?.copyWith(fontSize: 24),
-                  ),
-                  const SizedBox(height: 58),
-                  CustomButton(
-                    buttonText: "Fazer Login",
-                    onPressed: () {
-                      Navigator.of(context).pushNamed('/login');
-                    },
-                  ),
-                  const SizedBox(height: 40),
-                  CustomButton(
-                    buttonText: "Cadastrar-se",
-                    onPressed: () {
-                      Navigator.of(context).pushNamed('/register');
-                    },
-                  ),
-                ],
-              ),
-              const Spacer(),
-            ],
+            ),
           ),
-        ),
+          // ThemeSwitch posicionado no canto superior direito
+          const Positioned(
+            top: 40, // Ajuste este valor para o espaçamento desejado
+            right: 20, // Ajuste este valor para o espaçamento desejado
+            child: ThemeSwitch(),
+          ),
+        ],
       ),
     );
   }

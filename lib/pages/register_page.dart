@@ -2,7 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
-import 'dart:convert'; // For json.encode
+import 'dart:convert';
 
 // Assuming you have these custom components
 import 'package:mobile_megajr_grupo3/components/input.dart';
@@ -22,7 +22,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final TextEditingController _passwordController = TextEditingController();
   bool _isLoading = false;
 
-  // Function to show a SnackBar for success/error messages (like toast)
   void _showSnackBar(String message, {bool isError = false}) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -33,7 +32,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 
-  // Function to show a custom error dialog for email already exists
   void _showEmailExistsDialog() {
     showDialog(
       context: context,
@@ -42,7 +40,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
-          backgroundColor: Colors.grey[900], // Dark background
+          backgroundColor: Colors.grey[900],
           title: const Text(
             "Erro de Cadastro",
             style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
@@ -60,13 +58,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
               CustomButton(
                 buttonText: "Fazer Login",
                 onPressed: () {
-                  Navigator.of(context).pop(); // Close dialog
-                  Navigator.of(
-                    context,
-                  ).pushReplacementNamed('/login'); // Navigate to login
+                  Navigator.of(context).pop();
+                  Navigator.of(context).pushReplacementNamed('/login');
                 },
                 buttonStyle: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF5C2A84), // Your button color
+                  backgroundColor: const Color(0xFF5C2A84),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8),
                   ),
@@ -79,7 +75,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               const SizedBox(height: 10),
               TextButton(
                 onPressed: () {
-                  Navigator.of(context).pop(); // Close dialog
+                  Navigator.of(context).pop();
                 },
                 child: const Text(
                   "Fechar",
@@ -106,53 +102,51 @@ class _RegisterScreenState extends State<RegisterScreen> {
       final String email = _emailController.text.trim();
       final String password = _passwordController.text.trim();
 
-      // Call your backend API to register the user
+      // PASSO 1: CADASTRAR NO FIREBASE AUTHENTICATION
+      UserCredential userCredential = await FirebaseAuth.instance
+          .createUserWithEmailAndPassword(email: email, password: password);
+
+      // PASSO 2: SE O FIREBASE FOR BEM-SUCEDIDO, PEGAR O ID TOKEN
+      String? firebaseIdToken = await userCredential.user?.getIdToken();
+
+      if (firebaseIdToken == null) {
+        throw Exception("Não foi possível obter o ID Token do Firebase.");
+      }
+
+      // PASSO 3: ENVIAR PARA O SEU BACKEND COM O TOKEN
       final response = await http.post(
-        Uri.parse(
-          'https://megajr-back-end.onrender.com/cadastro',
-        ), // Replace with your actual backend endpoint
+        Uri.parse('https://megajr-back-end.onrender.com/api/register'),
         headers: <String, String>{
           'Content-Type': 'application/json; charset=UTF-8',
+          'Authorization': 'Bearer $firebaseIdToken',
         },
-        body: jsonEncode(<String, String>{
-          'name': name,
-          'email': email,
-          'senha':
-              password,
-        }),
+        body: jsonEncode(<String, String>{'name': name, 'email': email}),
       );
 
       if (response.statusCode == 409) {
         _showEmailExistsDialog();
-        return; // Stop further processing
+        // Opcional: Se o usuário foi criado no Firebase mas já existe no backend,
+        // você pode querer deletar o usuário do Firebase aqui para manter a consistência,
+        // ou ajustar a lógica do backend para lidar com isso.
+        // await userCredential.user?.delete();
+        return;
       }
 
       if (response.statusCode != 200 && response.statusCode != 201) {
-        // Handle other non-success status codes
         _showSnackBar("Erro ao cadastrar. Tente novamente.", isError: true);
         print("Backend error: ${response.statusCode} - ${response.body}");
         return;
       }
 
-      // If backend registration is successful, proceed with Firebase authentication
-      await FirebaseAuth.instance.createUserWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
-
       _showSnackBar("Cadastro realizado com sucesso!");
-      Navigator.of(
-        context,
-      ).pushReplacementNamed('/dashboard'); // Navigate to dashboard
+      Navigator.of(context).pushReplacementNamed('/dashboard');
     } on FirebaseAuthException catch (e) {
       String message;
       if (e.code == 'weak-password') {
         message = 'A senha fornecida é muito fraca.';
       } else if (e.code == 'email-already-in-use') {
-        // This case might be caught by your backend (status 409) first,
-        // but it's good to handle it here too for robustness.
         message = 'Este e-mail já está em uso.';
-        _showEmailExistsDialog(); // Show specific dialog for this case
+        _showEmailExistsDialog();
         return;
       } else if (e.code == 'invalid-email') {
         message = 'O formato do e-mail é inválido.';
@@ -174,7 +168,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
   }
 
-  // Dispose controllers to prevent memory leaks
   @override
   void dispose() {
     _nameController.dispose();
@@ -185,7 +178,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Determine if all fields are filled to enable the button
     final bool areFieldsFilled =
         _nameController.text.trim().isNotEmpty &&
         _emailController.text.trim().isNotEmpty &&
@@ -198,24 +190,23 @@ class _RegisterScreenState extends State<RegisterScreen> {
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            const SizedBox(height: 60), // Top padding
+            const SizedBox(height: 60),
             const Text(
               "Organize suas tarefas com Jubitasks!",
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 32,
                 fontWeight: FontWeight.w700,
-                color: Colors.black, // Or your app's primary text color
+                color: Colors.black,
               ),
             ),
-            const SizedBox(height: 80), // Gap
+            const SizedBox(height: 80),
             Image.asset(
-              'assets/splash-pato.png', // Make sure this asset is in your pubspec.yaml
+              'assets/splash-pato.png',
               height: 200,
               fit: BoxFit.contain,
             ),
-            const SizedBox(height: 80), // Gap
-
+            const SizedBox(height: 80),
             Form(
               child: Column(
                 children: [
@@ -223,10 +214,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     controller: _nameController,
                     labelText: "Nome",
                     hintText: "seu nome",
-                    onChanged:
-                        (value) => setState(
-                          () {},
-                        ), // Trigger rebuild to update button state
+                    onChanged: (value) => setState(() {}),
                   ),
                   const SizedBox(height: 16),
                   CustomInput(
@@ -243,7 +231,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     hintText: "sua senha",
                     onChanged: (value) => setState(() {}),
                   ),
-                  const SizedBox(height: 20), // Spacing before button
+                  const SizedBox(height: 20),
                   CustomButton(
                     buttonText: _isLoading ? "Cadastrando..." : "Cadastrar-se",
                     onPressed:
@@ -275,10 +263,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ],
               ),
             ),
-            const SizedBox(height: 20), // Spacing after register button
+            const SizedBox(height: 20),
             TextButton(
               onPressed: () {
-                Navigator.of(context).pushNamed('/login'); // Navigate to login
+                Navigator.of(context).pushNamed('/login');
               },
               child: const Text(
                 "login",

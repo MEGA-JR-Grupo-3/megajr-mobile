@@ -1,253 +1,756 @@
-// widgets/task_card.dart
+// lib/widgets/task_card.dart
 import 'package:flutter/material.dart';
-import '../models/task_model.dart';
-import 'add_task_form.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import '../models/task.dart';
+import 'package:intl/intl.dart';
+import '../pages/dashboard_page.dart' hide TaskPriority, TaskStatus;
 
-// Helper to get color based on priority
-Color _getPriorityColor(String priority) {
-  switch (priority.toLowerCase()) {
-    case 'Urgente':
-      return Colors.red.shade300;
-    case 'alta':
-      return Colors.orange.shade300;
-    case 'média': // Corrected from 'media'
-      return Colors.yellow.shade300;
-    case 'baixa':
-      return Colors.blue.shade300;
-    default:
-      return Colors.grey.shade300;
-  }
-}
+class TaskCard extends StatefulWidget {
+  final Task tarefa;
+  final Function(int taskId) onTaskDeleted;
+  final Function(Task updatedTask) onTaskUpdated;
+  final bool isDraggable;
+  final String firebaseIdToken;
+  final TaskDisplaySize taskDisplaySize;
+  final DueDateInfo Function(DateTime? date, BuildContext context)
+  getDueDateStatus;
+  final Color Function(TaskPriority priority, BuildContext context)
+  getPriorityColor;
 
-// Helper to get icon based on status
-IconData _getStatusIcon(String status) {
-  switch (status.toLowerCase()) {
-    case 'pendente':
-      return Icons.pending_actions_outlined;
-    case 'em progresso':
-      return Icons.directions_run; // Or Icons.sync for 'in progress'
-    case 'concluída':
-      return Icons.check_circle_outline;
-    default:
-      return Icons.help_outline;
-  }
-}
-
-class TaskCardWidget extends StatelessWidget {
-  final Task task;
-  final VoidCallback onTaskDeleted;
-  final Function(Task) onTaskUpdated; // Callback to pass the updated task
-
-  const TaskCardWidget({
+  const TaskCard({
     super.key,
-    required this.task,
+    required this.tarefa,
     required this.onTaskDeleted,
     required this.onTaskUpdated,
+    this.isDraggable = false,
+    required this.firebaseIdToken,
+    required this.taskDisplaySize,
+    required this.getDueDateStatus,
+    required this.getPriorityColor,
   });
 
-  void _showEditTaskForm(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        // Assuming AddTaskFormWidget can also handle editing if an existing task is passed
-        return AddTaskFormWidget(
-          userEmail:
-              "dummy@example.com", // This needs to be passed correctly if needed by the form
-          onTaskAdded: (updatedTask) {
-            // Renaming for clarity, it's an update here
-            onTaskUpdated(updatedTask);
-          },
-          existingTask: task, // Pass the current task to prefill the form
+  @override
+  State<TaskCard> createState() => _TaskCardState();
+}
+
+class _TaskCardState extends State<TaskCard> {
+  late Task _currentTask;
+  bool _isDeleting = false;
+  bool _isUpdatingStatus = false;
+  bool _isSavingEdit = false;
+
+  final TextEditingController _titleController = TextEditingController();
+  final TextEditingController _descriptionController = TextEditingController();
+  final TextEditingController _dateController = TextEditingController();
+  TaskPriority? _selectedPriority;
+  DateTime? _selectedDate;
+  bool _isEditing = false;
+  bool _isExpanded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentTask = widget.tarefa;
+    _titleController.text = _currentTask.titulo;
+    _descriptionController.text = _currentTask.descricao ?? '';
+    _selectedPriority = _currentTask.prioridade;
+    _selectedDate = _currentTask.dataPrazo;
+  }
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _descriptionController.dispose();
+    super.dispose();
+  }
+
+  Future<bool> _makeApiRequest({
+    required String endpoint,
+    required String method,
+    Map<String, dynamic>? body,
+    required Function(dynamic responseData) successCallback,
+    required String errorMsgPrefix,
+    required ValueSetter<bool> setLoadingState,
+  }) async {
+    if (widget.firebaseIdToken.isEmpty) {
+      if (!mounted) return false;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            "Sessão expirada ou não autenticada. Faça login novamente.",
+          ),
+        ),
+      );
+      return false;
+    }
+
+    setLoadingState(true);
+    final client = http.Client();
+    try {
+      final request =
+          http.Request(
+              method,
+              Uri.parse("https://megajr-back-end.onrender.com/api$endpoint"),
+            )
+            ..headers['Content-Type'] = 'application/json'
+            ..headers['Authorization'] = 'Bearer ${widget.firebaseIdToken}';
+
+      if (body != null) {
+        request.body = jsonEncode(body);
+      }
+
+      final response = await client.send(request);
+      final responseBody = await response.stream.bytesToString();
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        final responseData =
+            responseBody.isNotEmpty ? jsonDecode(responseBody) : {};
+        successCallback(responseData);
+        return true;
+      } else {
+        final errorData =
+            responseBody.isNotEmpty
+                ? jsonDecode(responseBody)
+                : {'message': response.reasonPhrase ?? 'Erro desconhecido'};
+        if (!mounted) return false;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              "$errorMsgPrefix: ${errorData['message'] ?? response.reasonPhrase}",
+            ),
+          ),
         );
+        if (response.statusCode == 401 || response.statusCode == 403) {
+          if (!mounted) return false;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                "Sessão expirada ou não autorizada. Faça login novamente.",
+              ),
+            ),
+          );
+        }
+        return false;
+      }
+    } catch (error) {
+      if (!mounted) return false;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Erro de conexão: ${errorMsgPrefix.toLowerCase()}."),
+        ),
+      );
+      return false;
+    } finally {
+      client.close();
+      setLoadingState(false);
+    }
+  }
+
+  Future<void> _handleDelete() async {
+    if (_isDeleting) return;
+    await _makeApiRequest(
+      endpoint: "/tasks/${_currentTask.idTarefa}",
+      method: "DELETE",
+      successCallback: (_) {
+        widget.onTaskDeleted(_currentTask.idTarefa);
       },
+      errorMsgPrefix: "Erro ao deletar tarefa",
+      setLoadingState: (loading) => setState(() => _isDeleting = loading),
     );
+  }
+
+  Future<void> _handleStatusChange(bool? isChecked) async {
+    if (_isUpdatingStatus) return;
+    final newStatus = isChecked! ? TaskStatus.Finalizada : TaskStatus.Pendente;
+    await _makeApiRequest(
+      endpoint: "/tasks/${_currentTask.idTarefa}/status",
+      method: "PUT",
+      body: {"estado_tarefa": newStatus.toString().split('.').last},
+      successCallback: (_) {
+        setState(() {
+          _currentTask = _currentTask.copyWith(estadoTarefa: newStatus);
+        });
+        widget.onTaskUpdated(_currentTask);
+      },
+      errorMsgPrefix: "Erro ao atualizar estado",
+      setLoadingState: (loading) => setState(() => _isUpdatingStatus = loading),
+    );
+  }
+
+  Future<void> _handleEditSave() async {
+    if (_isSavingEdit) return;
+
+    if (_titleController.text.trim().isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("O título da tarefa não pode ser vazio.")),
+      );
+      return;
+    }
+
+    DateTime? newDatePrazo;
+    try {
+      if (_dateController.text.isNotEmpty) {
+        newDatePrazo = DateFormat('yyyy-MM-dd').parse(_dateController.text);
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Formato de data inválido. Use AAAA-MM-DD."),
+        ),
+      );
+      return;
+    }
+
+    final updatedFields = {
+      "titulo": _titleController.text.trim(),
+      "descricao":
+          _descriptionController.text.trim().isEmpty
+              ? null
+              : _descriptionController.text.trim(),
+      "data_prazo": newDatePrazo?.toIso8601String().split('T').first,
+      "prioridade": _currentTask.prioridade.toString().split('.').last,
+      "estado_tarefa": _currentTask.estadoTarefa.toString().split('.').last,
+    };
+
+    await _makeApiRequest(
+      endpoint: "/tasks/${_currentTask.idTarefa}",
+      method: "PUT",
+      body: updatedFields,
+      successCallback: (_) {
+        setState(() {
+          _currentTask = _currentTask.copyWith(
+            titulo: updatedFields["titulo"] as String,
+            descricao: updatedFields["descricao"],
+            dataPrazo: newDatePrazo,
+          );
+          _isEditing = false;
+        });
+        widget.onTaskUpdated(_currentTask);
+      },
+      errorMsgPrefix: "Erro ao atualizar tarefa",
+      setLoadingState: (loading) => setState(() => _isSavingEdit = loading),
+    );
+  }
+
+  void _resetFormAndExitEdit() {
+    setState(() {
+      _isEditing = false;
+      _titleController.text = _currentTask.titulo;
+      _descriptionController.text = _currentTask.descricao ?? '';
+      _dateController.text =
+          _currentTask.dataPrazo != null
+              ? DateFormat('yyyy-MM-dd').format(_currentTask.dataPrazo!)
+              : '';
+    });
+  }
+
+  void _handleEditCancel() {
+    _resetFormAndExitEdit();
+  }
+
+  void _toggleExpand() {
+    setState(() {
+      _isExpanded = !_isExpanded;
+      if (_isEditing && _isExpanded) {
+        _resetFormAndExitEdit();
+      }
+    });
+  }
+
+  void _openEditMode() {
+    setState(() {
+      _titleController.text = _currentTask.titulo;
+      _descriptionController.text = _currentTask.descricao ?? '';
+      _dateController.text =
+          _currentTask.dataPrazo != null
+              ? DateFormat('yyyy-MM-dd').format(_currentTask.dataPrazo!)
+              : '';
+      _isEditing = true;
+      if (!_isExpanded) _isExpanded = true;
+    });
+  }
+
+  void _selectEditDate(BuildContext context) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: _currentTask.dataPrazo ?? DateTime.now(),
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2101),
+    );
+    if (picked != null) {
+      setState(() {
+        _currentTask = _currentTask.copyWith(dataPrazo: picked);
+        _dateController.text = DateFormat('yyyy-MM-dd').format(picked);
+      });
+    }
+  }
+
+  // Adaptação das funções de tamanho do Tailwind para responsividade
+  double _getCardWidth(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    switch (widget.taskDisplaySize) {
+      case TaskDisplaySize.small:
+        return screenWidth * 0.8;
+      case TaskDisplaySize.large:
+        return screenWidth * 0.9;
+      case TaskDisplaySize.medium:
+      default:
+        return screenWidth * 0.9;
+    }
+  }
+
+  EdgeInsets _getCardPadding() {
+    switch (widget.taskDisplaySize) {
+      case TaskDisplaySize.small:
+        return const EdgeInsets.all(12.0);
+      case TaskDisplaySize.large:
+        return const EdgeInsets.all(24.0);
+      case TaskDisplaySize.medium:
+      default:
+        return const EdgeInsets.all(16.0);
+    }
+  }
+
+  TextStyle _getTitleTextStyle(BuildContext context) {
+    switch (widget.taskDisplaySize) {
+      case TaskDisplaySize.small:
+        return Theme.of(context).textTheme.bodyLarge!;
+      case TaskDisplaySize.large:
+        return Theme.of(context).textTheme.headlineSmall!;
+      case TaskDisplaySize.medium:
+      default:
+        return Theme.of(context).textTheme.titleLarge!;
+    }
+  }
+
+  TextStyle _getDescriptionTextStyle(BuildContext context) {
+    switch (widget.taskDisplaySize) {
+      case TaskDisplaySize.small:
+        return Theme.of(context).textTheme.bodySmall!;
+      case TaskDisplaySize.large:
+        return Theme.of(context).textTheme.bodyLarge!;
+      case TaskDisplaySize.medium:
+      default:
+        return Theme.of(context).textTheme.bodyMedium!;
+    }
+  }
+
+  EdgeInsets _getDatePriorityPadding(BuildContext context) {
+    switch (widget.taskDisplaySize) {
+      case TaskDisplaySize.small:
+        return const EdgeInsets.symmetric(horizontal: 6.0, vertical: 2.0);
+      case TaskDisplaySize.large:
+        return const EdgeInsets.symmetric(horizontal: 12.0, vertical: 6.0);
+      case TaskDisplaySize.medium:
+      default:
+        return const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0);
+    }
+  }
+
+  TextStyle _getDatePriorityTextStyle(BuildContext context) {
+    switch (widget.taskDisplaySize) {
+      case TaskDisplaySize.small:
+        return Theme.of(context).textTheme.bodySmall!;
+      case TaskDisplaySize.large:
+        return Theme.of(context).textTheme.bodyLarge!;
+      case TaskDisplaySize.medium:
+      default:
+        return Theme.of(context).textTheme.bodySmall!;
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    // Determine text color based on card background for contrast
-    Color priorityColor = _getPriorityColor(task.prioridade);
-    // bool isDarkPriority = priorityColor.computeLuminance() < 0.5;
-    // Color textColor = isDarkPriority ? Colors.white : Colors.black87;
-    Color textColor = Colors.black87; // Defaulting to black for simplicity
+    // Agora você pode usar getDueDateStatus e getPriorityColor diretamente,
+    // pois foram passados como propriedades e seus tipos estão corretos.
+    final DueDateInfo dueDateInfo = widget.getDueDateStatus(
+      _currentTask.dataPrazo,
+      context,
+    );
+    final Color priorityColor = widget.getPriorityColor(
+      _currentTask.prioridade,
+      context,
+    );
+    final isLoading = _isDeleting || _isUpdatingStatus || _isSavingEdit;
+    final isTaskCompleted = _currentTask.estadoTarefa == TaskStatus.Finalizada;
 
     return Card(
-      elevation: 3.0,
-      margin: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
+      elevation: 4.0,
+      margin: const EdgeInsets.symmetric(vertical: 8.0),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
-      child: Container(
-        // width: 300, // Fixed width, or make it responsive
-        padding: const EdgeInsets.all(12.0),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12.0),
-          // Gradient or solid color based on your design
-          // border: Border.all(color: Colors.grey.shade300),
-          color: Colors.white, // Base color of the card
-          border: Border(
-            left: BorderSide(
-              color: _getPriorityColor(task.prioridade),
-              width: 5,
-            ),
-          ),
-        ),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min, // Important for GridView height
           children: [
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Expanded(
                   child: Text(
-                    task.titulo,
-                    style: TextStyle(
+                    _currentTask.titulo,
+                    style: _getTextStyle(widget.taskDisplaySize).copyWith(
                       fontWeight: FontWeight.bold,
-                      fontSize: 18.0,
-                      color: textColor,
+                      decoration:
+                          _currentTask.estadoTarefa == TaskStatus.Finalizada
+                              ? TextDecoration.lineThrough
+                              : null,
+                      color:
+                          _currentTask.estadoTarefa == TaskStatus.Finalizada
+                              ? Theme.of(
+                                context,
+                              ).colorScheme.onSurfaceVariant.withOpacity(0.6)
+                              : Theme.of(context).colorScheme.onSurface,
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                PopupMenuButton<String>(
-                  icon: Icon(Icons.more_vert, color: textColor),
-                  onSelected: (value) {
-                    if (value == 'edit') {
-                      _showEditTaskForm(context);
-                    } else if (value == 'delete') {
-                      // Show confirmation dialog before deleting
-                      showDialog(
-                        context: context,
-                        builder:
-                            (ctx) => AlertDialog(
-                              title: const Text('Confirmar Exclusão'),
-                              content: Text(
-                                'Tem certeza que deseja excluir a tarefa "${task.titulo}"?',
-                              ),
-                              actions: [
-                                TextButton(
-                                  onPressed: () => Navigator.of(ctx).pop(),
-                                  child: const Text('Cancelar'),
-                                ),
-                                TextButton(
-                                  onPressed: () {
-                                    Navigator.of(ctx).pop();
-                                    onTaskDeleted();
-                                  },
-                                  child: const Text(
-                                    'Excluir',
-                                    style: TextStyle(color: Colors.red),
-                                  ),
-                                ),
-                              ],
-                            ),
-                      );
+                if (!_isEditing)
+                  Row(
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.edit, size: 20),
+                        onPressed: () {
+                          setState(() {
+                            _isEditing = true;
+                          });
+                        },
+                      ),
+                      IconButton(
+                        icon: Icon(
+                          Icons.delete,
+                          size: 20,
+                          color: Theme.of(context).colorScheme.error,
+                        ),
+                        onPressed: () => _deleteTask(_currentTask.idTarefa),
+                      ),
+                    ],
+                  ),
+              ],
+            ),
+            if (!_isEditing) ...[
+              const SizedBox(height: 8.0),
+              Text(
+                _currentTask.descricao ?? 'Sem descrição',
+                style: _getTextStyle(widget.taskDisplaySize).copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  decoration:
+                      _currentTask.estadoTarefa == TaskStatus.Finalizada
+                          ? TextDecoration.lineThrough
+                          : null,
+                ),
+              ),
+              const SizedBox(height: 8.0),
+              Row(
+                children: [
+                  Icon(Icons.flag, size: 16, color: priorityColor),
+                  const SizedBox(width: 4.0),
+                  Text(
+                    _currentTask.prioridade.toString().split('.').last,
+                    style: _getTextStyle(widget.taskDisplaySize).copyWith(
+                      color: priorityColor,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(width: 16.0),
+                  Icon(
+                    Icons.calendar_today,
+                    size: 16,
+                    color: dueDateInfo.color,
+                  ),
+                  const SizedBox(width: 4.0),
+                  Text(
+                    dueDateInfo
+                        .text, // <-- Acesso correto ao 'text' de DueDateInfo
+                    style: _getTextStyle(widget.taskDisplaySize).copyWith(
+                      color: dueDateInfo.color,
+                      fontWeight:
+                          dueDateInfo.text.contains('Atrasado')
+                              ? FontWeight.bold
+                              : FontWeight.normal,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8.0),
+              Align(
+                alignment: Alignment.bottomRight,
+                child: Checkbox(
+                  value: _currentTask.estadoTarefa == TaskStatus.Finalizada,
+                  onChanged: (bool? newValue) {
+                    if (newValue != null) {
+                      _updateTaskStatus(newValue);
                     }
                   },
-                  itemBuilder:
-                      (BuildContext context) => <PopupMenuEntry<String>>[
-                        const PopupMenuItem<String>(
-                          value: 'edit',
-                          child: ListTile(
-                            leading: Icon(Icons.edit_outlined),
-                            title: Text('Editar'),
-                          ),
-                        ),
-                        const PopupMenuItem<String>(
-                          value: 'delete',
-                          child: ListTile(
-                            leading: Icon(
-                              Icons.delete_outline,
-                              color: Colors.redAccent,
-                            ),
-                            title: Text(
-                              'Excluir',
-                              style: TextStyle(color: Colors.redAccent),
-                            ),
-                          ),
-                        ),
-                      ],
+                  activeColor: Theme.of(context).colorScheme.tertiary,
+                  checkColor: Theme.of(context).colorScheme.onTertiary,
                 ),
-              ],
-            ),
-            const SizedBox(height: 8.0),
-            if (task.descricao.isNotEmpty)
-              Text(
-                task.descricao,
-                style: TextStyle(
-                  fontSize: 14.0,
-                  color: textColor.withOpacity(0.8),
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
               ),
-            const SizedBox(height: 10.0),
-            Row(
-              children: [
-                Icon(
-                  _getStatusIcon(task.status),
-                  size: 18,
-                  color: textColor.withOpacity(0.7),
+            ] else ...[
+              // Modo de Edição (se você tiver um)
+              TextField(
+                controller: _titleController,
+                decoration: const InputDecoration(labelText: 'Título'),
+              ),
+              TextField(
+                controller: _descriptionController,
+                decoration: const InputDecoration(labelText: 'Descrição'),
+              ),
+              DropdownButtonFormField<TaskPriority>(
+                value: _selectedPriority,
+                onChanged: (TaskPriority? newValue) {
+                  setState(() {
+                    _selectedPriority = newValue;
+                  });
+                },
+                items:
+                    TaskPriority.values.map((priority) {
+                      return DropdownMenuItem(
+                        value: priority,
+                        child: Text(priority.toString().split('.').last),
+                      );
+                    }).toList(),
+                decoration: const InputDecoration(labelText: 'Prioridade'),
+              ),
+              ListTile(
+                title: Text(
+                  _selectedDate == null
+                      ? 'Selecionar Data de Prazo'
+                      : DateFormat('dd/MM/yyyy').format(_selectedDate!),
                 ),
-                const SizedBox(width: 4),
-                Text(
-                  task.status,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: textColor.withOpacity(0.7),
+                trailing: const Icon(Icons.calendar_today),
+                onTap: () async {
+                  final DateTime? picked = await showDatePicker(
+                    context: context,
+                    initialDate: _selectedDate ?? DateTime.now(),
+                    firstDate: DateTime(2000),
+                    lastDate: DateTime(2101),
+                  );
+                  if (picked != null && picked != _selectedDate) {
+                    setState(() {
+                      _selectedDate = picked;
+                    });
+                  }
+                },
+              ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () {
+                      setState(() {
+                        _isEditing = false;
+                        // Resetar os controladores caso o usuário cancele
+                        _titleController.text = _currentTask.titulo;
+                        _descriptionController.text =
+                            _currentTask.descricao ?? '';
+                        _selectedPriority = _currentTask.prioridade;
+                        _selectedDate = _currentTask.dataPrazo;
+                      });
+                    },
+                    child: const Text('Cancelar'),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 6.0),
-            Row(
-              children: [
-                Icon(
-                  Icons.calendar_today_outlined,
-                  size: 16,
-                  color: textColor.withOpacity(0.7),
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  'Concluir até: ${task.dataConclusao}', // Format date if needed
-                  style: TextStyle(
-                    fontSize: 13.0,
-                    color: textColor.withOpacity(0.7),
+                  ElevatedButton(
+                    onPressed: _isSavingEdit ? null : () => _saveEditedTask(),
+                    child:
+                        _isSavingEdit
+                            ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                            : const Text('Salvar'),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10.0),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: _getPriorityColor(task.prioridade).withOpacity(0.2),
-                borderRadius: BorderRadius.circular(20),
+                ],
               ),
-              child: Text(
-                task.prioridade,
-                style: TextStyle(
-                  color: _getPriorityColor(
-                    task.prioridade,
-                  ).darken(0.3), // Make text darker for better contrast
-                  fontWeight: FontWeight.w500,
-                  fontSize: 12,
-                ),
-              ),
-            ),
-            // Add more details or actions as needed
+            ],
           ],
         ),
       ),
     );
   }
-}
 
-// Extension to darken a color (for text contrast on light backgrounds)
-extension ColorUtils on Color {
-  Color darken([double amount = .1]) {
-    assert(amount >= 0 && amount <= 1);
-    final hsl = HSLColor.fromColor(this);
-    final hslDark = hsl.withLightness((hsl.lightness - amount).clamp(0.0, 1.0));
-    return hslDark.toColor();
+  TextStyle _getTextStyle(TaskDisplaySize size) {
+    switch (size) {
+      case TaskDisplaySize.small:
+        return Theme.of(context).textTheme.bodySmall!;
+      case TaskDisplaySize.medium:
+        return Theme.of(context).textTheme.bodyMedium!;
+      case TaskDisplaySize.large:
+        return Theme.of(context).textTheme.bodyLarge!;
+    }
+  }
+
+  // ... (métodos _deleteTask, _updateTaskStatus, _saveEditedTask)
+
+  Future<void> _deleteTask(int taskId) async {
+    setState(() {
+      _isDeleting = true;
+    });
+    try {
+      final response = await http.delete(
+        Uri.parse("https://megajr-back-end.onrender.com/api/tasks/$taskId"),
+        headers: {'Authorization': 'Bearer ${widget.firebaseIdToken}'},
+      );
+      if (response.statusCode == 200) {
+        widget.onTaskDeleted(taskId);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Tarefa deletada com sucesso!')),
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Erro ao deletar tarefa: ${response.body}')),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro de conexão ao deletar tarefa: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isDeleting = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _updateTaskStatus(bool isCompleted) async {
+    setState(() {
+      _isUpdatingStatus = true;
+    });
+
+    final newStatus = isCompleted ? TaskStatus.Finalizada : TaskStatus.Pendente;
+    final updatedTask = _currentTask.copyWith(estadoTarefa: newStatus);
+
+    try {
+      final response = await http.put(
+        Uri.parse(
+          "https://megajr-back-end.onrender.com/api/tasks/${updatedTask.idTarefa}/status",
+        ),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ${widget.firebaseIdToken}',
+        },
+        body: json.encode({
+          'estado_tarefa': newStatus.toString().split('.').last,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        setState(() {
+          _currentTask = updatedTask;
+        });
+        widget.onTaskUpdated(_currentTask); // Notifica o dashboard
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Tarefa ${isCompleted ? 'finalizada' : 'reaberta'}!',
+              ),
+            ),
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Erro ao atualizar status: ${response.body}'),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro de conexão ao atualizar status: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUpdatingStatus = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _saveEditedTask() async {
+    if (_titleController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('O título da tarefa não pode ser vazio.')),
+      );
+      return;
+    }
+
+    setState(() {
+      _isSavingEdit = true;
+    });
+
+    final updatedTask = _currentTask.copyWith(
+      titulo: _titleController.text,
+      descricao:
+          _descriptionController.text.isEmpty
+              ? null
+              : _descriptionController.text,
+      dataPrazo: _selectedDate,
+      prioridade: _selectedPriority,
+    );
+
+    try {
+      final response = await http.put(
+        Uri.parse(
+          "https://megajr-back-end.onrender.com/api/tasks/${updatedTask.idTarefa}",
+        ),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ${widget.firebaseIdToken}',
+        },
+        body: json.encode(updatedTask.toJson()),
+      );
+
+      if (response.statusCode == 200) {
+        setState(() {
+          _currentTask = updatedTask;
+          _isEditing = false;
+        });
+        widget.onTaskUpdated(_currentTask);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Tarefa atualizada com sucesso!')),
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Erro ao salvar tarefa: ${response.body}')),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro de conexão ao salvar tarefa: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSavingEdit = false;
+        });
+      }
+    }
   }
 }

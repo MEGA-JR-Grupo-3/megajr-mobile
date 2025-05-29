@@ -4,16 +4,6 @@ import 'package:firebase_core/firebase_core.dart' show FirebaseOptions;
 import 'package:flutter/foundation.dart'
     show defaultTargetPlatform, kIsWeb, TargetPlatform;
 
-/// Default [FirebaseOptions] for use with your Firebase apps.
-///
-/// Example:
-/// ```dart
-/// import 'firebase_options.dart';
-/// // ...
-/// await Firebase.initializeApp(
-///   options: DefaultFirebaseOptions.currentPlatform,
-/// );
-/// ```
 class DefaultFirebaseOptions {
   static FirebaseOptions get currentPlatform {
     if (kIsWeb) {
@@ -63,7 +53,8 @@ class DefaultFirebaseOptions {
     messagingSenderId: '190657188583',
     projectId: 'autenticacao-mega',
     storageBucket: 'autenticacao-mega.firebasestorage.app',
-    iosClientId: '190657188583-c4j081mdnsap7d618828mcikhatbmlsr.apps.googleusercontent.com',
+    iosClientId:
+        '190657188583-c4j081mdnsap7d618828mcikhatbmlsr.apps.googleusercontent.com',
     iosBundleId: 'com.example.mobileMegajrGrupo3',
   );
 
@@ -73,7 +64,8 @@ class DefaultFirebaseOptions {
     messagingSenderId: '190657188583',
     projectId: 'autenticacao-mega',
     storageBucket: 'autenticacao-mega.firebasestorage.app',
-    iosClientId: '190657188583-c4j081mdnsap7d618828mcikhatbmlsr.apps.googleusercontent.com',
+    iosClientId:
+        '190657188583-c4j081mdnsap7d618828mcikhatbmlsr.apps.googleusercontent.com',
     iosBundleId: 'com.example.mobileMegajrGrupo3',
   );
 

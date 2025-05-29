@@ -1,19 +1,27 @@
 // lib/services/auth_service.dart
+import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:google_sign_in/google_sign_in.dart'; // Importe o GoogleSignIn
+import 'package:google_sign_in/google_sign_in.dart';
 
-class AuthService {
+// Faça a classe AuthService estender ChangeNotifier
+class AuthService extends ChangeNotifier {
   final FirebaseAuth _firebaseAuth = FirebaseAuth.instance;
-  final GoogleSignIn _googleSignIn = GoogleSignIn(); // Instancie o GoogleSignIn
+  final GoogleSignIn _googleSignIn = GoogleSignIn();
 
   Stream<User?> get authStateChanges => _firebaseAuth.authStateChanges();
 
-  User? getCurrentUser() {
-    return _firebaseAuth.currentUser;
+  User? _currentUser;
+  User? get currentUser => _currentUser;
+
+  AuthService() {
+    _firebaseAuth.authStateChanges().listen((User? user) {
+      _currentUser = user;
+      notifyListeners();
+    });
   }
 
-  // MÉTODO PARA LOGIN COM E-MAIL E SENHA (EXISTENTE, MAS CHAMEI DE signInWithEmailAndPassword)
-  Future<UserCredential> signInWithEmailAndPassword(
+  // MÉTODO PARA LOGIN COM E-MAIL E SENHA
+  Future<UserCredential?> signInWithEmailAndPassword(
     String email,
     String password,
   ) async {
@@ -22,64 +30,59 @@ class AuthService {
           .signInWithEmailAndPassword(email: email, password: password);
       return userCredential;
     } on FirebaseAuthException catch (e) {
-      print(
-        'Firebase Auth Exception (Email/Password): ${e.code} - ${e.message}',
-      );
-      rethrow;
+      return null;
     } catch (e) {
-      print('Generic Sign In Exception (Email/Password): $e');
-      rethrow;
+      return null;
     }
   }
 
-  // MÉTODO PARA LOGIN COM GOOGLE (ADICIONADO)
+  // MÉTODO PARA LOGIN COM GOOGLE
   Future<UserCredential?> signInWithGoogle() async {
     try {
       final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
       if (googleUser == null) {
-        return null; // Usuário cancelou o login
+        return null;
       }
-      final GoogleSignInAuthentication? googleAuth =
+      final GoogleSignInAuthentication googleAuth =
           await googleUser.authentication;
       final credential = GoogleAuthProvider.credential(
-        accessToken: googleAuth?.accessToken,
-        idToken: googleAuth?.idToken,
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
       );
-      return await _firebaseAuth.signInWithCredential(credential);
+      UserCredential userCredential = await _firebaseAuth.signInWithCredential(
+        credential,
+      );
+      return userCredential;
     } on FirebaseAuthException catch (e) {
-      print(
-        "FirebaseAuthException during Google Sign-In: ${e.code} - ${e.message}",
-      );
       rethrow;
     } catch (e) {
-      print("Error during Google Sign-In: $e");
       rethrow;
     }
   }
 
-  // Exemplo de método de registro (se você tiver um)
-  Future<UserCredential> createUserWithEmailAndPassword(
+  // MÉTODO DE REGISTRO
+  Future<UserCredential?> createUserWithEmailAndPassword(
     String email,
     String password,
-    String displayName,
+    String? displayName,
   ) async {
     try {
       UserCredential userCredential = await _firebaseAuth
           .createUserWithEmailAndPassword(email: email, password: password);
-      await userCredential.user?.updateDisplayName(displayName);
+      if (displayName != null && userCredential.user != null) {
+        await userCredential.user!.updateDisplayName(displayName);
+      }
       return userCredential;
     } on FirebaseAuthException catch (e) {
-      print('Firebase Auth Exception (Create User): ${e.code} - ${e.message}');
       rethrow;
     } catch (e) {
-      print('Generic Create User Exception: $e');
       rethrow;
     }
   }
 
-  // MÉTODO DE LOGOUT (ADICIONADO _googleSignIn.signOut())
+  // MÉTODO DE LOGOUT
   Future<void> signOut() async {
-    await _googleSignIn.signOut(); // Desloga da conta Google
-    await _firebaseAuth.signOut(); // Desloga do Firebase
+    await _googleSignIn.signOut();
+    await _firebaseAuth.signOut();
   }
 }

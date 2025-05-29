@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CLIENT_ID</key>
+	<string>190657188583-c4j081mdnsap7d618828mcikhatbmlsr.apps.googleusercontent.com</string>
+	<key>REVERSED_CLIENT_ID</key>
+	<string>com.googleusercontent.apps.190657188583-c4j081mdnsap7d618828mcikhatbmlsr</string>
+	<key>ANDROID_CLIENT_ID</key>
+	<string>190657188583-g5v5oartaifqq162cm0643d33k4sj1nv.apps.googleusercontent.com</string>
+	<key>API_KEY</key>
+	<string>AIzaSyCfk_-_lpX6vC4kzR1RnU_D6rCRWH_zLZ8</string>
+	<key>GCM_SENDER_ID</key>
+	<string>190657188583</string>
+	<key>PLIST_VERSION</key>
+	<string>1</string>
+	<key>BUNDLE_ID</key>
+	<string>com.example.mobileMegajrGrupo3</string>
+	<key>PROJECT_ID</key>
+	<string>autenticacao-mega</string>
+	<key>STORAGE_BUCKET</key>
+	<string>autenticacao-mega.firebasestorage.app</string>
+	<key>IS_ADS_ENABLED</key>
+	<false></false>
+	<key>IS_ANALYTICS_ENABLED</key>
+	<false></false>
+	<key>IS_APPINVITE_ENABLED</key>
+	<true></true>
+	<key>IS_GCM_ENABLED</key>
+	<true></true>
+	<key>IS_SIGNIN_ENABLED</key>
+	<true></true>
+	<key>GOOGLE_APP_ID</key>
+	<string>1:190657188583:ios:2262fc9cac2b43f1b14842</string>
+</dict>
+</plist>

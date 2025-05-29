@@ -1,515 +1,720 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter_spinkit/flutter_spinkit.dart';
-import 'package:reorderable_grid_view/reorderable_grid_view.dart';
+import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'package:provider/provider.dart';
+import 'package:intl/intl.dart';
+import 'package:mobile_megajr_grupo3/models/task.dart';
+import 'package:mobile_megajr_grupo3/widgets/add_task_form.dart';
+import 'package:mobile_megajr_grupo3/widgets/task_card.dart';
+import 'package:mobile_megajr_grupo3/widgets/custom_button.dart';
+import 'package:mobile_megajr_grupo3/providers/auth_provider.dart';
+import 'package:mobile_megajr_grupo3/theme/app_theme.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
-import '../models/task_model.dart';
-import '../services/auth_service.dart';
-import '../services/api_service.dart';
-import '../widgets/task_card.dart';
-import '../widgets/add_task_form.dart';
-import '../widgets/sidebar_drawer.dart';
-import '../widgets/search_input.dart';
-
-class DashboardScreen extends StatefulWidget {
-  const DashboardScreen({super.key});
+class DashboardPage extends StatefulWidget {
+  const DashboardPage({super.key});
 
   @override
-  State<DashboardScreen> createState() => _DashboardScreenState();
+  State<DashboardPage> createState() => _DashboardPageState();
 }
 
-class _DashboardScreenState extends State<DashboardScreen> {
-  final AuthService _authService = AuthService();
-  final ApiService _apiService = ApiService();
-  User? _currentUser;
-  bool _isLoadingPage = true; // For initial page load
-  bool _isLoadingTasks = false;
-  String _registeredName = "";
+class _DashboardPageState extends State<DashboardPage> {
   List<Task> _allTasks = [];
   List<Task> _filteredTasks = [];
-  String? _errorMessage; // For modal error messages
-  final TextEditingController _searchController = TextEditingController();
+  bool _isLoadingTasks = false;
+  bool _showFilterOptions = false;
+  bool _showAddTaskForm = false;
+  String _selectedFilter = 'all'; // 'all', 'pending', 'completed'
+  String _sortBy = 'date'; // 'date', 'priority', 'title', 'description'
+  String _sortOrder = 'asc'; // 'asc', 'desc'
+  TaskDisplaySize _taskDisplaySize =
+      TaskDisplaySize
+          .medium; // <-- Este TaskDisplaySize agora vem de models/task.dart
+  int _completedTasksCount = 0;
+  String _currentSearchTerm = ''; // Adicionado para a busca
+
+  final GlobalKey<ScaffoldState> _scaffoldKey =
+      GlobalKey<ScaffoldState>(); // Chave para controlar o Scaffold/Drawer
+
+  final String _backendUrl =
+      "https://megajr-back-end.onrender.com/api"; // Corrigi a string do URL
+
+  final Map<TaskPriority, int> _priorityOrder = {
+    TaskPriority.Urgente: 1,
+    TaskPriority.Alta: 2,
+    TaskPriority.Normal: 3,
+    TaskPriority.Baixa: 4,
+  };
 
   @override
   void initState() {
     super.initState();
-    _currentUser = _authService.getCurrentUser();
-    if (_currentUser == null) {
-      // This should ideally be handled by the StreamBuilder in main.dart
-      // but as a fallback:
-      WidgetsBinding.instance.addPostFrameCallback((_) {
+    _loadTaskDisplaySize();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      if (authProvider.isAuthenticated &&
+          authProvider.firebaseIdToken != null) {
+        _loadTasks();
+      } else {
         Navigator.of(context).pushReplacementNamed('/login');
+      }
+    });
+  }
+
+  // Função para carregar o tamanho de exibição das tarefas
+  Future<void> _loadTaskDisplaySize() async {
+    final prefs = await SharedPreferences.getInstance();
+    final savedSize = prefs.getString('taskDisplaySize');
+    if (savedSize != null) {
+      setState(() {
+        _taskDisplaySize = TaskDisplaySize.values.firstWhere(
+          (e) => e.toString().split('.').last == savedSize,
+          orElse: () => TaskDisplaySize.medium,
+        );
       });
-    } else {
-      _initializeDashboard();
     }
   }
 
-  Future<void> _initializeDashboard() async {
-    setState(() => _isLoadingPage = true);
-    await _fetchUserData();
-    await _fetchTasks();
-    setState(() => _isLoadingPage = false);
+  // Função para salvar o tamanho de exibição das tarefas
+  Future<void> _saveTaskDisplaySize(TaskDisplaySize size) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('taskDisplaySize', size.toString().split('.').last);
   }
 
-  Future<void> _fetchUserData() async {
-    if (_currentUser?.email == null) return;
-    try {
-      final userData = await _apiService.fetchUserData(_currentUser!.email!);
-      if (mounted) {
-        setState(() {
-          _registeredName = userData['name'] as String? ?? "";
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        _showErrorDialog("Erro ao buscar dados do usuário: $e");
-      }
-    }
-  }
+  // Função para carregar as tarefas do backend
+  Future<void> _loadTasks() async {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final firebaseIdToken = authProvider.firebaseIdToken;
 
-  Future<void> _fetchTasks() async {
-    if (_currentUser?.email == null) return;
-    if (mounted) setState(() => _isLoadingTasks = true);
-    try {
-      final tasks = await _apiService.fetchTasks(_currentUser!.email!);
+    if (firebaseIdToken == null) {
       if (mounted) {
-        setState(() {
-          _allTasks = tasks;
-          // Sort tasks by order if available, or by some default
-          _allTasks.sort((a, b) => (a.order ?? 0).compareTo(b.order ?? 0));
-          _filteredTasks = List.from(_allTasks);
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        _showErrorDialog("Erro ao buscar tarefas: $e");
-        _filteredTasks = []; // Clear tasks on error
-      }
-    } finally {
-      if (mounted) setState(() => _isLoadingTasks = false);
-    }
-  }
-
-  void _handleSearch(String searchTerm) async {
-    if (searchTerm.isEmpty) {
-      if (mounted) {
-        setState(() {
-          _filteredTasks = List.from(_allTasks);
-          _errorMessage = null; // Clear any previous search error
-        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              "Erro: Token de autenticação não disponível. Redirecionando...",
+            ),
+          ),
+        );
+        // O AuthProvider já lida com o redirecionamento
+        //Navigator.of(context).pushReplacementNamed('/login');
       }
       return;
     }
 
-    if (mounted) setState(() => _isLoadingTasks = true);
-    try {
-      // Pass current user's email if your backend search is user-specific
-      final tasks = await _apiService.searchTasks(
-        searchTerm,
-        _currentUser!.email!,
-      );
-      if (mounted) {
-        setState(() {
-          _filteredTasks = tasks;
-          if (tasks.isEmpty) {
-            _errorMessage = "Nenhuma task encontrada para sua busca.";
-          } else {
-            _errorMessage = null;
-          }
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _filteredTasks = []; // Clear tasks on error
-          _errorMessage = "Erro de conexão ao pesquisar.";
-        });
-      }
-    } finally {
-      if (mounted) setState(() => _isLoadingTasks = false);
-    }
-  }
-
-  void _onTaskAdded(Task newTask) {
-    // The AddTaskForm now returns the new task, or we can refetch
-    // For simplicity, refetching ensures data consistency with backend
-    _fetchTasks();
-    // Or, add locally for quicker UI update and then sync:
-    // if (mounted) {
-    //   setState(() {
-    //     _allTasks.add(newTask);
-    //     _filteredTasks = List.from(_allTasks); // or apply current filter
-    //   });
-    // }
-  }
-
-  void _onTaskDeleted(String deletedTaskId) async {
-    try {
-      await _apiService.deleteTask(deletedTaskId);
-      if (mounted) {
-        setState(() {
-          _allTasks.removeWhere((task) => task.idTarefa == deletedTaskId);
-          _filteredTasks.removeWhere((task) => task.idTarefa == deletedTaskId);
-        });
-      }
-    } catch (e) {
-      if (mounted) _showErrorDialog("Erro ao deletar tarefa: $e");
-    }
-  }
-
-  void _onTaskUpdated(Task updatedTask) async {
-    // For simplicity, refetching. Or update locally:
-    _fetchTasks();
-    // if (mounted) {
-    //   setState(() {
-    //     _allTasks = _allTasks.map((task) =>
-    //       task.idTarefa == updatedTask.idTarefa ? updatedTask : task).toList();
-    //     _filteredTasks = _filteredTasks.map((task) =>
-    //       task.idTarefa == updatedTask.idTarefa ? updatedTask : task).toList();
-    //   });
-    // }
-  }
-
-  void _onReorder(int oldIndex, int newIndex) {
     if (mounted) {
       setState(() {
-        final Task item = _filteredTasks.removeAt(oldIndex);
-        _filteredTasks.insert(newIndex, item);
-
-        // Update order property for all tasks in _filteredTasks
-        for (int i = 0; i < _filteredTasks.length; i++) {
-          _filteredTasks[i].order = i;
-        }
-        // Also update _allTasks if necessary, or handle merging logic
-        // This example focuses on the displayed list.
+        _isLoadingTasks = true;
       });
-      // Persist the new order to the backend
-      if (_currentUser?.email != null) {
-        _apiService
-            .updateTaskOrder(_filteredTasks, _currentUser!.email!)
-            .catchError(
-              (e) => _showErrorDialog("Erro ao salvar nova ordem: $e"),
-            );
+    }
+
+    try {
+      final response = await http.get(
+        Uri.parse("$_backendUrl/tasks"),
+        headers: {'Authorization': 'Bearer $firebaseIdToken'},
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = json.decode(response.body);
+        if (mounted) {
+          setState(() {
+            _allTasks = data.map((json) => Task.fromJson(json)).toList();
+            _completedTasksCount =
+                _allTasks
+                    .where((task) => task.estadoTarefa == TaskStatus.Finalizada)
+                    .length;
+          });
+          _applyFiltersAndSort(); // Aplica filtros e ordenação após carregar
+        }
+      } else if (response.statusCode == 401 || response.statusCode == 403) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("Sessão expirada. Faça login novamente."),
+            ),
+          );
+        }
+        // O AuthProvider já desloga e redireciona automaticamente
+        await authProvider.signOut();
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Erro ao carregar tarefas: ${response.statusCode} - ${response.reasonPhrase}',
+              ),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro de conexão ao carregar tarefas: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoadingTasks = false;
+        });
       }
     }
   }
 
-  void _showAddTaskForm() {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AddTaskFormWidget(
-          onTaskAdded: (newTask) {
-            // Expecting the form to return the newly created task
-            _onTaskAdded(newTask);
-          },
-          userEmail: _currentUser!.email!, // Pass userEmail to the form
-        );
-      },
-    );
+  // Função para aplicar filtros e ordenação às tarefas
+  void _applyFiltersAndSort() {
+    setState(() {
+      List<Task> tempTasks = List.from(_allTasks);
+
+      // 1. Filtrar pelo termo de busca
+      if (_currentSearchTerm.isNotEmpty) {
+        final lowerCaseSearchTerm = _currentSearchTerm.toLowerCase();
+        tempTasks =
+            tempTasks.where((task) {
+              return task.titulo.toLowerCase().contains(lowerCaseSearchTerm) ||
+                  (task.descricao?.toLowerCase() ?? '').contains(
+                    lowerCaseSearchTerm,
+                  );
+            }).toList();
+      }
+
+      // 2. Filtrar por status
+      tempTasks =
+          tempTasks.where((task) {
+            if (_selectedFilter == 'pending') {
+              return task.estadoTarefa == TaskStatus.Pendente;
+            } else if (_selectedFilter == 'completed') {
+              return task.estadoTarefa == TaskStatus.Finalizada;
+            }
+            return true; // 'all'
+          }).toList();
+
+      // Separar tarefas pendentes e finalizadas para ordenação específica
+      List<Task> pendingTasks =
+          tempTasks
+              .where((task) => task.estadoTarefa == TaskStatus.Pendente)
+              .toList();
+      List<Task> completedTasks =
+          tempTasks
+              .where((task) => task.estadoTarefa == TaskStatus.Finalizada)
+              .toList();
+
+      // 3. Ordenar tarefas pendentes
+      pendingTasks.sort((a, b) {
+        int compareResult = 0;
+
+        switch (_sortBy) {
+          case 'priority':
+            final aPriority = _priorityOrder[a.prioridade] ?? 99;
+            final bPriority = _priorityOrder[b.prioridade] ?? 99;
+            compareResult = aPriority.compareTo(bPriority);
+            break;
+          case 'date':
+            if (a.dataPrazo == null && b.dataPrazo == null) {
+              compareResult = 0;
+            } else if (a.dataPrazo == null) {
+              compareResult = 1;
+            } else if (b.dataPrazo == null) {
+              compareResult = -1;
+            } else {
+              compareResult = a.dataPrazo!.compareTo(b.dataPrazo!);
+            }
+            break;
+          case 'title':
+            compareResult = a.titulo.toLowerCase().compareTo(
+              b.titulo.toLowerCase(),
+            );
+            break;
+          case 'description':
+            final aDesc = a.descricao?.toLowerCase() ?? '';
+            final bDesc = b.descricao?.toLowerCase() ?? '';
+            compareResult = aDesc.compareTo(bDesc);
+            break;
+          default:
+            // Fallback para ordenação padrão por prioridade e depois data se _sortBy for 'all' ou não reconhecido
+            final aPriority = _priorityOrder[a.prioridade] ?? 99;
+            final bPriority = _priorityOrder[b.prioridade] ?? 99;
+            compareResult = aPriority.compareTo(bPriority);
+            if (compareResult == 0) {
+              if (a.dataPrazo == null && b.dataPrazo == null) {
+                compareResult = 0;
+              } else if (a.dataPrazo == null) {
+                compareResult = 1;
+              } else if (b.dataPrazo == null) {
+                compareResult = -1;
+              } else {
+                compareResult = a.dataPrazo!.compareTo(b.dataPrazo!);
+              }
+            }
+            break;
+        }
+
+        return _sortOrder == 'asc' ? compareResult : -compareResult;
+      });
+
+      // Tarefas finalizadas não são reordenáveis e podem ter uma ordem padrão (ex: por data de conclusão, ou simplesmente após as pendentes)
+      // Por simplicidade, as mantemos na ordem em que aparecem no array após a filtragem de status
+      completedTasks.sort((a, b) {
+        if (a.dataPrazo == null && b.dataPrazo == null) return 0;
+        if (a.dataPrazo == null) return 1;
+        if (b.dataPrazo == null) return -1;
+        return b.dataPrazo!.compareTo(a.dataPrazo!);
+      });
+
+      _filteredTasks = [...pendingTasks, ...completedTasks];
+    });
   }
 
-  void _showErrorDialog(String message) {
-    if (!mounted) return;
-    // If there's already an error dialog, don't show another one
-    // This simple check might need refinement for complex scenarios
-    if (ModalRoute.of(context)?.isCurrent != true) {
-      // If a dialog is already open, perhaps log or use a SnackBar
+  // Handlers para eventos
+  void _handleTaskAdded(Task newTask) {
+    setState(() {
+      _allTasks.add(newTask);
+      _applyFiltersAndSort(); // Reaplicar filtros para incluir a nova tarefa
+      _showAddTaskForm = false; // Fechar o formulário
+    });
+    _loadTasks(); // Recarregar para garantir sincronia e ordem do backend
+  }
+
+  void _handleTaskDeleted(String taskId) {
+    setState(() {
+      _allTasks.removeWhere((task) => task.idTarefa == taskId);
+      _applyFiltersAndSort(); // Reaplicar filtros
+    });
+    _loadTasks(); // Recarregar para garantir sincronia
+  }
+
+  void _handleTaskUpdated(Task updatedTask) {
+    setState(() {
+      _allTasks =
+          _allTasks.map((task) {
+            return task.idTarefa == updatedTask.idTarefa ? updatedTask : task;
+          }).toList();
+      _applyFiltersAndSort(); // Reaplicar filtros
+    });
+    _loadTasks(); // Recarregar para garantir sincronia (especialmente se o status mudou)
+  }
+
+  void _handleDeleteAllCompleted() async {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final firebaseIdToken = authProvider.firebaseIdToken;
+
+    if (firebaseIdToken == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(message, style: const TextStyle(color: Colors.white)),
-          backgroundColor: Colors.redAccent,
+        const SnackBar(
+          content: Text("Erro: Token de autenticação não disponível."),
         ),
       );
       return;
     }
 
-    showDialog(
+    // Mostrar modal de confirmação
+    final bool? confirm = await showDialog<bool>(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: const Text("Erro", style: TextStyle(color: Colors.redAccent)),
-          content: Text(message),
+          title: const Text('Confirmar Exclusão'),
+          content: const Text(
+            'Tem certeza que deseja deletar todas as tarefas concluídas?',
+          ),
           actions: <Widget>[
             TextButton(
-              child: const Text("Fechar"),
-              onPressed: () {
-                Navigator.of(context).pop();
-                if (mounted) {
-                  setState(() {
-                    _errorMessage =
-                        null; // Clear the page-level error message if any
-                  });
-                }
-              },
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancelar'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Deletar'),
             ),
           ],
         );
       },
     );
+
+    if (confirm == true) {
+      setState(() {
+        _isLoadingTasks = true;
+      });
+      try {
+        final response = await http.delete(
+          Uri.parse("$_backendUrl/tasks/delete-completed"),
+          headers: {'Authorization': 'Bearer $firebaseIdToken'},
+        );
+
+        if (response.statusCode == 200) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text("Tarefas concluídas deletadas com sucesso!"),
+              ),
+            );
+          }
+          _loadTasks(); // Recarregar todas as tarefas
+        } else if (response.statusCode == 401 || response.statusCode == 403) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text("Sessão expirada. Faça login novamente."),
+              ),
+            );
+          }
+          await authProvider.signOut();
+        } else {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  "Erro ao deletar tarefas concluídas: ${response.body}",
+                ),
+              ),
+            );
+          }
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text("Erro de conexão: $e")));
+        }
+      } finally {
+        if (mounted) {
+          setState(() {
+            _isLoadingTasks = false;
+          });
+        }
+      }
+    }
   }
+
+  // --- Widgets e UI ---
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoadingPage) {
-      return const Scaffold(
-        body: Center(
-          child: SpinKitFadingCircle(color: Colors.blue, size: 50.0),
-        ),
-      );
-    }
-
-    final screenWidth = MediaQuery.of(context).size.width;
-    int crossAxisCount = 1;
-    if (screenWidth > 1024) {
-      // lg
-      crossAxisCount = 3;
-    } else if (screenWidth > 640) {
-      // sm
-      crossAxisCount = 2;
-    }
-    double childAspectRatio =
-        screenWidth /
-        (crossAxisCount * 350); // Adjust 350 based on desired card height
+    final authProvider = Provider.of<AuthProvider>(context);
+    final user = authProvider.user;
+    final registeredName = authProvider.registeredName;
 
     return Scaffold(
-      // Using a GlobalKey for the Scaffold to open the drawer programmatically
       key: _scaffoldKey,
       appBar: AppBar(
-        // Show menu icon to open drawer only on smaller screens
-        leading:
-            (screenWidth < 1024) // 'lg' breakpoint in Tailwind
-                ? IconButton(
-                  icon: const Icon(Icons.menu),
-                  onPressed: () => _scaffoldKey.currentState?.openDrawer(),
-                )
-                : null, // No leading icon on larger screens if sidebar is always visible or different trigger
-        title: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (screenWidth < 1024) // lg:hidden
-              Image.asset(
-                'assets/splash-pato.png',
-                height: 30,
-                fit: BoxFit.contain,
-              ),
-            if (screenWidth < 1024) // lg:hidden
-              const SizedBox(width: 8),
-            if (screenWidth < 1024) // lg:hidden
-              Expanded(
-                child: Text(
-                  'Olá, ${_registeredName.isNotEmpty ? _registeredName : _currentUser?.displayName ?? "parceiro(a)!"}',
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-          ],
-        ),
-        // On larger screens, the title might be different or not needed if sidebar is persistent
-        centerTitle:
-            (screenWidth < 1024) ? false : true, // Adjust as per your design
+        title: const Text('Suas JubiTasks'),
+        backgroundColor: Theme.of(context).primaryColor,
         actions: [
-          // If sidebar is not persistent on large screens, add a button for it here too
-          // or handle it differently.
-          if (screenWidth >= 1024)
-            Padding(
-              padding: const EdgeInsets.only(right: 16.0),
-              child: Text(
-                'Olá, ${_registeredName.isNotEmpty ? _registeredName : _currentUser?.displayName ?? "parceiro(a)!"}',
-                style: const TextStyle(fontSize: 18),
-              ),
-            ),
-          if (screenWidth >= 1024)
-            IconButton(
-              icon: const Icon(Icons.logout),
-              onPressed: () async {
-                await _authService.signOut();
-                if (mounted)
-                  Navigator.of(context).pushReplacementNamed('/login');
-              },
-            ),
-        ],
-      ),
-      // Sidebar (Drawer)
-      drawer:
-          (screenWidth < 1024)
-              ? SidebarDrawer(
-                userName:
-                    _registeredName.isNotEmpty
-                        ? _registeredName
-                        : _currentUser?.displayName ?? "Usuário",
-                userEmail: _currentUser?.email ?? "Não logado",
-                onLogout: () async {
-                  Navigator.of(context).pop(); // Close drawer first
-                  await _authService.signOut();
-                  if (mounted)
-                    Navigator.of(context).pushReplacementNamed('/login');
-                },
-              )
-              : null, // No drawer if sidebar is part of the main layout on large screens
-
-      body: Row(
-        children: [
-          // Persistent Sidebar for large screens
-          if (screenWidth >= 1024) // 'lg' breakpoint
-            SidebarDrawer(
-              userName:
-                  _registeredName.isNotEmpty
-                      ? _registeredName
-                      : _currentUser?.displayName ?? "Usuário",
-              userEmail: _currentUser?.email ?? "Não logado",
-              onLogout: () async {
-                await _authService.signOut();
-                if (mounted)
-                  Navigator.of(context).pushReplacementNamed('/login');
-              },
-            ),
-
-          // Main content area
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.all(8.0), // p-2
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  SearchInputWidget(
-                    controller: _searchController,
-                    onSearch: _handleSearch,
-                    // tarefas: _allTasks, // Pass all tasks if client-side filtering is needed
-                  ),
-                  const SizedBox(height: 20), // pt-[30px] approx
-                  Text(
-                    "Suas JubiTasks",
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                  const SizedBox(height: 15), // mt-[30px] approx
-                  if (_isLoadingTasks)
-                    const Expanded(
-                      child: Center(
-                        child: SpinKitFadingCircle(
-                          color: Colors.grey,
-                          size: 40.0,
-                        ),
-                      ),
-                    )
-                  else if (_errorMessage != null && _filteredTasks.isEmpty)
-                    Expanded(
-                      child: Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(16.0),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(
-                                _errorMessage!,
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  color: Colors.grey[700],
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                              const SizedBox(height: 20),
-                              ElevatedButton(
-                                onPressed: () {
-                                  _searchController.clear();
-                                  _handleSearch(
-                                    "",
-                                  ); // Clear search and fetch all
-                                },
-                                child: const Text("Limpar Busca"),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    )
-                  else if (_filteredTasks.isEmpty)
-                    Expanded(
-                      child: Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(
-                            16.0,
-                          ), // For overall padding
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(
-                                "Bora organizar sua vida!",
-                                style: Theme.of(
-                                  context,
-                                ).textTheme.titleLarge?.copyWith(fontSize: 20),
-                                textAlign: TextAlign.center,
-                              ),
-                              const SizedBox(height: 30), // gap-14 approx
-                              Image.asset(
-                                'assets/pato-triste.png',
-                                width:
-                                    180, // Adjusted from 250 for typical mobile view
-                                height: 180,
-                                fit: BoxFit.contain,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    )
-                  else
-                    Expanded(
-                      child: ReorderableGridView.builder(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 4.0,
-                          vertical: 15.0,
-                        ), // px-4 mt-[30px]
-                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: crossAxisCount,
-                          childAspectRatio:
-                              childAspectRatio, // Adjust for card aspect ratio
-                          crossAxisSpacing: 16, // gap-4
-                          mainAxisSpacing: 16, // gap-4
-                        ),
-                        itemCount: _filteredTasks.length,
-                        itemBuilder: (context, index) {
-                          final task = _filteredTasks[index];
-                          return TaskCardWidget(
-                            key: ValueKey(
-                              task.idTarefa,
-                            ), // Important for reordering
-                            task: task,
-                            onTaskDeleted: () => _onTaskDeleted(task.idTarefa),
-                            onTaskUpdated:
-                                (updatedTask) => _onTaskUpdated(updatedTask),
-                            // isDraggable is inherent with ReorderableGridView
-                          );
-                        },
-                        onReorder: _onReorder,
-                      ),
-                    ),
-                ],
-              ),
-            ),
+          IconButton(
+            icon: const Icon(Icons.menu),
+            onPressed: () {
+              _scaffoldKey.currentState?.openEndDrawer();
+            },
           ),
         ],
       ),
+      endDrawer: Drawer(
+        // ... Conteúdo do Drawer ...
+      ),
+      // >>> AQUI É ONDE O FLOATINGACTIONBUTTON DEVE IR <<<
       floatingActionButton: FloatingActionButton(
-        onPressed: _showAddTaskForm,
-        backgroundColor: Colors.deepPurpleAccent, // Example color
-        tooltip: 'Adicionar Tarefa',
-        child: const Icon(Icons.add, color: Colors.white),
+        // <-- ADICIONE A PROPRIEDADE floatingActionButton AQUI
+        onPressed: () {
+          setState(() {
+            _showAddTaskForm = true;
+          });
+        },
+        backgroundColor: Theme.of(context).colorScheme.primary,
+        child: Icon(Icons.add, color: Theme.of(context).colorScheme.onPrimary),
+      ),
+      // >>> FIM DO FLOATINGACTIONBUTTON <<<
+      body: Stack(
+        children: [
+          SingleChildScrollView(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                TextField(
+                  onChanged: (value) {
+                    setState(() {
+                      _currentSearchTerm = value;
+                    });
+                    _applyFiltersAndSort();
+                  },
+                  decoration: InputDecoration(
+                    labelText: 'Buscar Tarefas',
+                    hintText: 'Pesquisar por título ou descrição...',
+                    prefixIcon: const Icon(Icons.search),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10.0),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: PopupMenuButton<String>(
+                    itemBuilder:
+                        (BuildContext context) => <PopupMenuEntry<String>>[
+                          const PopupMenuItem<String>(
+                            value: 'priority',
+                            child: Text('Prioridade'),
+                          ),
+                          const PopupMenuItem<String>(
+                            value: 'date',
+                            child: Text('Data'),
+                          ),
+                          const PopupMenuItem<String>(
+                            value: 'title',
+                            child: Text('Título'),
+                          ),
+                          const PopupMenuItem<String>(
+                            value: 'description',
+                            child: Text('Descrição'),
+                          ),
+                        ],
+                    onSelected: (String value) {
+                      setState(() {
+                        _sortBy = value;
+                        _sortOrder = 'asc';
+                      });
+                      _applyFiltersAndSort();
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.primaryContainer,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.filter_list,
+                            color:
+                                Theme.of(
+                                  context,
+                                ).colorScheme.onPrimaryContainer,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Filtrar por',
+                            style: TextStyle(
+                              color:
+                                  Theme.of(
+                                    context,
+                                  ).colorScheme.onPrimaryContainer,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                if (_sortBy != 'date' || _sortOrder != 'asc')
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8.0),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Chip(
+                          label: Text(
+                            'Filtrado por: ${getFilterLabel(_sortBy)} (${getSortOrderLabel(_sortOrder)})',
+                            style: TextStyle(
+                              color:
+                                  Theme.of(
+                                    context,
+                                  ).colorScheme.onTertiaryContainer,
+                            ),
+                          ),
+                          backgroundColor:
+                              Theme.of(context).colorScheme.tertiaryContainer,
+                          onDeleted: () {
+                            setState(() {
+                              _sortBy = 'date';
+                              _sortOrder = 'asc';
+                            });
+                            _applyFiltersAndSort();
+                          },
+                          deleteIconColor:
+                              Theme.of(context).colorScheme.onTertiaryContainer,
+                        ),
+                        const SizedBox(width: 8),
+                        // Botões para trocar a ordem (asc/desc)
+                        CustomButton(
+                          buttonText: 'Crescente',
+                          onClick: () {
+                            setState(() {
+                              _sortOrder = 'asc';
+                            });
+                            _applyFiltersAndSort();
+                          },
+                          // Removido o parâmetro 'style' e usando as propriedades de cor existentes
+                          primaryColor:
+                              _sortOrder == 'asc'
+                                  ? Theme.of(context).colorScheme.primary
+                                  : Theme.of(
+                                    context,
+                                  ).colorScheme.onSurfaceVariant,
+                          secondaryColor:
+                              _sortOrder == 'asc'
+                                  ? Theme.of(context).colorScheme.secondary
+                                  : Theme.of(context)
+                                      .colorScheme
+                                      .onSurfaceVariant
+                                      .withOpacity(0.7),
+                        ),
+                        const SizedBox(width: 8),
+                        CustomButton(
+                          buttonText: 'Decrescente',
+                          onClick: () {
+                            setState(() {
+                              _sortOrder = 'desc';
+                            });
+                            _applyFiltersAndSort();
+                          },
+                          // Removido o parâmetro 'style' e usando as propriedades de cor existentes
+                          primaryColor:
+                              _sortOrder == 'desc'
+                                  ? Theme.of(context).colorScheme.primary
+                                  : Theme.of(
+                                    context,
+                                  ).colorScheme.onSurfaceVariant,
+                          secondaryColor:
+                              _sortOrder == 'desc'
+                                  ? Theme.of(context).colorScheme.secondary
+                                  : Theme.of(context)
+                                      .colorScheme
+                                      .onSurfaceVariant
+                                      .withOpacity(0.7),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                const SizedBox(height: 16),
+
+                if (_completedTasksCount > 0)
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: CustomButton(
+                      buttonText: 'Deletar Concluídas ($_completedTasksCount)',
+                      onClick: _handleDeleteAllCompleted,
+                      // Removido o parâmetro 'buttonStyle' e usando as propriedades de cor existentes
+                      primaryColor: Theme.of(context).colorScheme.error,
+                      secondaryColor: Theme.of(
+                        context,
+                      ).colorScheme.error.withOpacity(0.7),
+                    ),
+                  ),
+                const SizedBox(height: 16),
+
+                _isLoadingTasks
+                    ? const Center(child: CircularProgressIndicator())
+                    : _filteredTasks.isEmpty &&
+                        !_isLoadingTasks &&
+                        _currentSearchTerm.isEmpty
+                    ? const Center(
+                      child: Text(
+                        'Nenhuma tarefa encontrada. Crie sua primeira tarefa!',
+                        style: TextStyle(fontSize: 18, color: Colors.grey),
+                      ),
+                    )
+                    : ListView.builder(
+                      padding: const EdgeInsets.all(8.0),
+                      itemCount: _filteredTasks.length,
+                      itemBuilder: (context, index) {
+                        final task = _filteredTasks[index];
+                        return TaskCard(
+                          tarefa: task,
+                          onTaskDeleted: (taskId) {
+                            _handleTaskDeleted(
+                              taskId.toString(),
+                            ); // Corrigido novamente aqui, se necessário
+                          },
+                          onTaskUpdated: (updatedTask) {
+                            _handleTaskUpdated(updatedTask);
+                          },
+                          firebaseIdToken: authProvider.firebaseIdToken!,
+                          taskDisplaySize: _taskDisplaySize,
+                          getDueDateStatus: getDueDateStatus,
+                          getPriorityColor: getPriorityColor,
+                        );
+                      },
+                    ),
+              ],
+            ),
+          ),
+          if (_showAddTaskForm)
+            Positioned.fill(
+              child: GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _showAddTaskForm = false;
+                  });
+                },
+                child: Container(
+                  color: Colors.black54,
+                  child: Center(
+                    child: AddTaskForm(
+                      onCancel: () {
+                        setState(() {
+                          _showAddTaskForm = false;
+                        });
+                      },
+                      onTaskAdded: _handleTaskAdded,
+                      firebaseIdToken: authProvider.firebaseIdToken ?? '',
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ], // Fechamento da lista de children do Stack
       ),
     );
   }
 
-  final GlobalKey<ScaffoldState> _scaffoldKey =
-      GlobalKey<ScaffoldState>(); // For opening drawer
+  String getFilterLabel(String sortBy) {
+    switch (sortBy) {
+      case 'priority':
+        return 'Prioridade';
+      case 'date':
+        return 'Data';
+      case 'title':
+        return 'Título';
+      case 'description':
+        return 'Descrição';
+      default:
+        return 'Padrão';
+    }
+  }
 
-  @override
-  void dispose() {
-    _searchController.dispose();
-    // Dispose other controllers if any
-    super.dispose();
+  String getSortOrderLabel(String sortOrder) {
+    return sortOrder == 'asc' ? 'Crescente' : 'Decrescente';
+  }
+
+  int _getCrossAxisCount(TaskDisplaySize size) {
+    switch (size) {
+      case TaskDisplaySize.small:
+        return 3;
+      case TaskDisplaySize.medium:
+        return 2;
+      case TaskDisplaySize.large:
+        return 1;
+      default:
+        return 2;
+    }
+  }
+
+  double _getCardAspectRatio(TaskDisplaySize size) {
+    switch (size) {
+      case TaskDisplaySize.small:
+        return 0.8;
+      case TaskDisplaySize.medium:
+        return 1.0;
+      case TaskDisplaySize.large:
+        return 2.0;
+      default:
+        return 1.0;
+    }
   }
 }

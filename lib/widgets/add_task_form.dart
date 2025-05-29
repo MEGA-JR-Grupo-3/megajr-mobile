@@ -1,219 +1,231 @@
-// widgets/add_task_form.dart
 import 'package:flutter/material.dart';
-import '../models/task_model.dart';
-import '../services/api_service.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'package:firebase_auth/firebase_auth.dart';
+import '../models/task.dart';
 
-class AddTaskFormWidget extends StatefulWidget {
-  final Function(Task) onTaskAdded; // Callback after task is successfully added/updated
-  final String userEmail; // Needed if your backend associates tasks with users on creation
-  final Task? existingTask; // Optional: if provided, the form is for editing
+class AddTaskForm extends StatefulWidget {
+  final VoidCallback onCancel;
+  final Function(Task newTask) onTaskAdded;
+  final String firebaseIdToken;
 
-  const AddTaskFormWidget({
+  const AddTaskForm({
     super.key,
+    required this.onCancel,
     required this.onTaskAdded,
-    required this.userEmail,
-    this.existingTask,
+    required this.firebaseIdToken,
   });
 
   @override
-  State<AddTaskFormWidget> createState() => _AddTaskFormWidgetState();
+  AddTaskFormState createState() => AddTaskFormState();
 }
 
-class _AddTaskFormWidgetState extends State<AddTaskFormWidget> {
+class AddTaskFormState extends State<AddTaskForm> {
   final _formKey = GlobalKey<FormState>();
-  final ApiService _apiService = ApiService();
+  String _titulo = "";
+  String _descricao = "";
+  DateTime? _dataPrazo;
+  String _prioridade = "Normal";
 
-  late TextEditingController _titleController;
-  late TextEditingController _descriptionController;
-  late TextEditingController _dueDateController;
-  String _selectedPriority = 'Média'; // Default priority
-  String _selectedStatus = 'Pendente'; // Default status
-
-  bool _isLoading = false;
-
-  final List<String> _priorities = ['Baixa', 'Média', 'Alta', 'Urgente'];
-  final List<String> _statuses = ['Pendente', 'Em Progresso', 'Concluída'];
-
-  @override
-  void initState() {
-    super.initState();
-    _titleController = TextEditingController(text: widget.existingTask?.titulo ?? '');
-    _descriptionController = TextEditingController(text: widget.existingTask?.descricao ?? '');
-    _dueDateController = TextEditingController(text: widget.existingTask?.dataConclusao ?? '');
-    _selectedPriority = widget.existingTask?.prioridade ?? 'Média';
-    _selectedStatus = widget.existingTask?.status ?? 'Pendente';
-
-     if (widget.existingTask == null && _dueDateController.text.isEmpty) {
-      _dueDateController.text = DateTime.now().toIso8601String().substring(0, 10); // Default to today
-    }
-  }
+  final String _backendUrl = "https://megajr-back-end.onrender.com/api";
 
   Future<void> _selectDate(BuildContext context) async {
     final DateTime? picked = await showDatePicker(
       context: context,
-      initialDate: _dueDateController.text.isNotEmpty
-          ? (DateTime.tryParse(_dueDateController.text) ?? DateTime.now())
-          : DateTime.now(),
+      initialDate: _dataPrazo ?? DateTime.now(),
       firstDate: DateTime(2000),
       lastDate: DateTime(2101),
     );
-    if (picked != null && picked.toIso8601String().substring(0, 10) != _dueDateController.text) {
+    if (picked != null && picked != _dataPrazo) {
       setState(() {
-        _dueDateController.text = picked.toIso8601String().substring(0, 10);
+        _dataPrazo = picked;
       });
     }
   }
 
-  Future<void> _submitForm() async {
-    if (_formKey.currentState!.validate()) {
-      setState(() => _isLoading = true);
+  Future<void> _handleSubmit() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+    _formKey.currentState!.save();
 
-      Map<String, dynamic> taskData = {
-        'titulo': _titleController.text,
-        'descricao': _descriptionController.text,
-        'data_conclusao': _dueDateController.text,
-        'prioridade': _selectedPriority,
-        'status': _selectedStatus,
-        // 'email': widget.userEmail, // Backend might require email
-      };
+    final String firebaseIdToken = widget.firebaseIdToken;
 
-      try {
-        Task? resultTask;
-        if (widget.existingTask != null) {
-          // Update existing task
-          resultTask = await _apiService.updateTask(widget.existingTask!.idTarefa, taskData);
-        } else {
-          // Add new task
-          resultTask = await _apiService.addTask(taskData, widget.userEmail);
+    if (firebaseIdToken == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Faça login para adicionar tarefas.")),
+      );
+      return;
+    }
+
+    final Map<String, dynamic> newTaskData = {
+      "titulo": _titulo,
+      "descricao": _descricao,
+      "data_prazo": _dataPrazo?.toIso8601String().split('T').first,
+      "prioridade": _prioridade,
+      "estado_tarefa": "Pendente",
+    };
+
+    try {
+      final response = await http.post(
+        Uri.parse("$_backendUrl/tasks/add"),
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer $firebaseIdToken",
+        },
+        body: jsonEncode(newTaskData),
+      );
+
+      if (response.statusCode == 201) {
+        final Map<String, dynamic> responseData = json.decode(response.body);
+        final newTask = Task.fromJson(responseData);
+        if (mounted) {
+          widget.onTaskAdded(newTask);
+          Navigator.of(context).pop();
         }
-
-        if (resultTask != null) {
-          widget.onTaskAdded(resultTask); // Pass the created/updated task back
-          if (mounted) Navigator.of(context).pop(); // Close dialog
-        } else {
-           if (mounted) _showErrorSnackbar("Falha ao ${widget.existingTask != null ? 'atualizar' : 'adicionar'} tarefa. Resposta nula do servidor.");
-        }
-      } catch (e) {
-        if (mounted) _showErrorSnackbar("Erro ao ${widget.existingTask != null ? 'atualizar' : 'adicionar'} tarefa: $e");
-      } finally {
-        if (mounted) setState(() => _isLoading = false);
+      } else {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Erro ao adicionar tarefa: ${response.statusCode} - ${response.reasonPhrase}',
+            ),
+          ),
+        );
       }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erro de conexão ao adicionar tarefa: $e')),
+      );
     }
   }
 
-  void _showErrorSnackbar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message, style: const TextStyle(color: Colors.white)),
-        backgroundColor: Colors.redAccent,
-      ),
-    );
-  }
-
-
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: Text(widget.existingTask != null ? 'Editar Tarefa' : 'Adicionar Nova Tarefa'),
-      content: SingleChildScrollView(
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.0)),
+      child: Container(
+        padding: const EdgeInsets.all(24.0),
+        width: 330,
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: BorderRadius.circular(8.0),
+        ),
         child: Form(
           key: _formKey,
           child: Column(
             mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                "Adicionar Nova Tarefa",
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: Theme.of(context).colorScheme.onSurface,
+                ),
+              ),
+              const SizedBox(height: 20),
               TextFormField(
-                controller: _titleController,
-                decoration: const InputDecoration(labelText: 'Título da Tarefa'),
+                decoration: const InputDecoration(
+                  labelText: "Título:",
+                  border: OutlineInputBorder(),
+                ),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
-                    return 'Por favor, insira um título';
+                    return "Por favor, insira um título.";
                   }
                   return null;
                 },
+                onSaved: (value) {
+                  _titulo = value!;
+                },
               ),
+              const SizedBox(height: 12),
               TextFormField(
-                controller: _descriptionController,
-                decoration: const InputDecoration(labelText: 'Descrição (Opcional)'),
-                maxLines: 2,
+                decoration: const InputDecoration(
+                  labelText: "Descrição:",
+                  border: OutlineInputBorder(),
+                ),
+                maxLines: 3,
+                onSaved: (value) {
+                  _descricao = value!;
+                },
               ),
-              TextFormField(
-                controller: _dueDateController,
-                decoration: InputDecoration(
-                  labelText: 'Data de Conclusão (YYYY-MM-DD)',
-                  suffixIcon: IconButton(
-                    icon: const Icon(Icons.calendar_today),
-                    onPressed: () => _selectDate(context),
+              const SizedBox(height: 12),
+              GestureDetector(
+                onTap: () => _selectDate(context),
+                child: AbsorbPointer(
+                  child: TextFormField(
+                    decoration: InputDecoration(
+                      labelText: "Data Prazo:",
+                      border: const OutlineInputBorder(),
+                      suffixIcon: const Icon(Icons.calendar_today),
+                    ),
+                    controller: TextEditingController(
+                      text:
+                          _dataPrazo == null
+                              ? ""
+                              : "${_dataPrazo!.day}/${_dataPrazo!.month}/${_dataPrazo!.year}",
+                    ),
                   ),
                 ),
-                readOnly: true, // Make it read-only if using date picker exclusively
-                onTap: () => _selectDate(context),
-                 validator: (value) {
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                decoration: const InputDecoration(
+                  labelText: "Prioridade:",
+                  border: OutlineInputBorder(),
+                ),
+                value: _prioridade,
+                items:
+                    <String>[
+                      "Baixa",
+                      "Normal",
+                      "Alta",
+                      "Urgente",
+                    ].map<DropdownMenuItem<String>>((String value) {
+                      return DropdownMenuItem<String>(
+                        value: value,
+                        child: Text(value),
+                      );
+                    }).toList(),
+                onChanged: (String? newValue) {
+                  setState(() {
+                    _prioridade = newValue!;
+                  });
+                },
+                validator: (value) {
                   if (value == null || value.isEmpty) {
-                    return 'Por favor, insira uma data de conclusão';
-                  }
-                  // Basic date format validation (YYYY-MM-DD)
-                  final RegExp dateRegExp = RegExp(r'^\d{4}-\d{2}-\d{2}$');
-                  if (!dateRegExp.hasMatch(value)) {
-                    return 'Formato de data inválido. Use YYYY-MM-DD';
+                    return "Por favor, selecione uma prioridade.";
                   }
                   return null;
                 },
               ),
-              DropdownButtonFormField<String>(
-                value: _selectedPriority,
-                decoration: const InputDecoration(labelText: 'Prioridade'),
-                items: _priorities.map((String value) {
-                  return DropdownMenuItem<String>(
-                    value: value,
-                    child: Text(value),
-                  );
-                }).toList(),
-                onChanged: (newValue) {
-                  setState(() {
-                    _selectedPriority = newValue!;
-                  });
-                },
+              const SizedBox(height: 24),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: widget.onCancel,
+                    child: const Text("Cancelar"),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton(
+                    onPressed: _handleSubmit,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue,
+                      foregroundColor: Colors.white,
+                    ),
+                    child: const Text("Salvar"),
+                  ),
+                ],
               ),
-              if (widget.existingTask != null) // Only show status for existing tasks, or define default for new
-                DropdownButtonFormField<String>(
-                  value: _selectedStatus,
-                  decoration: const InputDecoration(labelText: 'Status'),
-                  items: _statuses.map((String value) {
-                    return DropdownMenuItem<String>(
-                      value: value,
-                      child: Text(value),
-                    );
-                  }).toList(),
-                  onChanged: (newValue) {
-                    setState(() {
-                      _selectedStatus = newValue!;
-                    });
-                  },
-                ),
             ],
           ),
         ),
       ),
-      actions: <Widget>[
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancelar'),
-        ),
-        ElevatedButton(
-          onPressed: _isLoading ? null : _submitForm,
-          child: _isLoading
-              ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-              : Text(widget.existingTask != null ? 'Atualizar' : 'Adicionar'),
-        ),
-      ],
     );
-  }
-
-  @override
-  void dispose() {
-    _titleController.dispose();
-    _descriptionController.dispose();
-    _dueDateController.dispose();
-    super.dispose();
   }
 }

@@ -1,77 +1,111 @@
-// widgets/search_input.dart
+// lib/widgets/search_input.dart
 import 'package:flutter/material.dart';
-// import '../models/task_model.dart'; // If client-side filtering was intended
+import 'dart:async';
 
-class SearchInputWidget extends StatefulWidget {
-  final Function(String) onSearch;
-  final TextEditingController controller;
-  // final List<Task> tarefas; // For client-side filtering, if needed
+class SearchInput extends StatefulWidget {
+  final List<dynamic>? tarefas;
+  final ValueChanged<String> onSearch;
 
-  const SearchInputWidget({
-    super.key,
-    required this.onSearch,
-    required this.controller,
-    // required this.tarefas,
-  });
+  const SearchInput({super.key, this.tarefas, required this.onSearch});
 
   @override
-  State<SearchInputWidget> createState() => _SearchInputWidgetState();
+  State<SearchInput> createState() => _SearchInputState();
 }
 
-class _SearchInputWidgetState extends State<SearchInputWidget> {
-  // TextEditingController _searchController = TextEditingController(); // Use passed controller
+class _SearchInputState extends State<SearchInput> {
+  final TextEditingController _searchController = TextEditingController();
+  Timer? _debounce;
 
   @override
   void initState() {
     super.initState();
-    // Listen to changes in the text field for real-time search (optional)
-    // widget.controller.addListener(() {
-    //   widget.onSearch(widget.controller.text);
-    // });
+    _searchController.addListener(_onSearchChanged);
+  }
+
+  // Implementação do debounce
+  void _onSearchChanged() {
+    if (_debounce?.isActive ?? false) _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 300), () {
+      widget.onSearch(_searchController.text);
+    });
+  }
+
+  void _handleClearClick() {
+    _searchController.clear();
+    widget.onSearch('');
+  }
+
+  @override
+  void dispose() {
+    _searchController.removeListener(_onSearchChanged);
+    _searchController.dispose();
+    _debounce?.cancel();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 10.0),
-      child: TextField(
-        controller: widget.controller,
-        decoration: InputDecoration(
-          hintText: 'Pesquisar JubiTasks...',
-          prefixIcon: const Icon(Icons.search),
-          suffixIcon: widget.controller.text.isNotEmpty
-              ? IconButton(
-                  icon: const Icon(Icons.clear),
-                  onPressed: () {
-                    widget.controller.clear();
-                    widget.onSearch(''); // Trigger search with empty term to show all
-                  },
-                )
-              : null,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(25.0),
-            borderSide: BorderSide.none,
+    final Color subbackgroundColor = Theme.of(context).colorScheme.surface;
+    final Color textColor = Theme.of(context).colorScheme.onSurface;
+    final Color hintColor = textColor.withValues(alpha: 0.6);
+
+    return Container(
+      width: 320,
+      constraints: const BoxConstraints(maxWidth: 600),
+      margin: const EdgeInsets.only(top: 20),
+      child: Stack(
+        alignment: Alignment.centerRight,
+        children: [
+          TextField(
+            controller: _searchController,
+            decoration: InputDecoration(
+              hintText: "Pesquisar tarefas...",
+              hintStyle: TextStyle(color: hintColor),
+              filled: true,
+              fillColor: subbackgroundColor,
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 12,
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(30.0),
+                borderSide: BorderSide(color: textColor.withValues(alpha: 0.5)),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(30.0),
+                borderSide: BorderSide(color: textColor.withValues(alpha: 0.5)),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(30.0),
+                borderSide: BorderSide(
+                  color: Theme.of(context).colorScheme.primary,
+                  width: 2.0,
+                ),
+              ),
+              suffixIcon: ValueListenableBuilder<TextEditingValue>(
+                valueListenable: _searchController,
+                builder: (context, value, child) {
+                  if (value.text.isNotEmpty) {
+                    return IconButton(
+                      icon: const Icon(Icons.close),
+                      color: Colors.grey.shade500,
+                      hoverColor: Colors.grey.shade700,
+                      onPressed: _handleClearClick,
+                    );
+                  }
+                  return const SizedBox.shrink();
+                },
+              ),
+              suffixIconConstraints: const BoxConstraints(
+                minWidth: 48,
+                minHeight: 48,
+              ),
+            ),
+            style: TextStyle(color: textColor),
+            cursorColor: Theme.of(context).colorScheme.primary,
           ),
-          filled: true,
-          fillColor: Colors.grey[200], // Adjust color to match your theme
-          contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 20),
-        ),
-        onChanged: (value) {
-           // For real-time search as user types
-           // widget.onSearch(value);
-           // Or, if you want search on submit/button press, remove this and use onSubmitted
-        },
-        onSubmitted: (value) {
-          // Trigger search when user submits (e.g., presses enter)
-          widget.onSearch(value);
-        },
+        ],
       ),
     );
   }
-
-  // @override
-  // void dispose() {
-  //   // widget.controller.dispose(); // Controller is managed by the parent (DashboardScreen)
-  //   super.dispose();
-  // }
 }
