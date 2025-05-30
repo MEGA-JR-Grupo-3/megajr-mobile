@@ -289,28 +289,39 @@ class _TaskCardState extends State<TaskCard> {
   }
 
   // Adaptação das funções de tamanho do Tailwind para responsividade
-  double _getCardWidth(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
+  double _getCardWidth() {
     switch (widget.taskDisplaySize) {
       case TaskDisplaySize.small:
-        return screenWidth * 0.8;
+        return 235.0; // w-[235px]
       case TaskDisplaySize.large:
-        return screenWidth * 0.9;
+        return 400.0; // w-[400px]
       case TaskDisplaySize.medium:
       default:
-        return screenWidth * 0.9;
+        return 335.0;
+    }
+  }
+
+  double _getCardMinHeight() {
+    switch (widget.taskDisplaySize) {
+      case TaskDisplaySize.small:
+        return 120.0; // min-h-[120px]
+      case TaskDisplaySize.large:
+        return 220.0; // min-h-[220px]
+      case TaskDisplaySize.medium:
+      default:
+        return 100.0; // min-h-[100px]
     }
   }
 
   EdgeInsets _getCardPadding() {
     switch (widget.taskDisplaySize) {
       case TaskDisplaySize.small:
-        return const EdgeInsets.all(12.0);
+        return const EdgeInsets.all(12.0); // p-3 (equivalente a 12px)
       case TaskDisplaySize.large:
-        return const EdgeInsets.all(24.0);
+        return const EdgeInsets.all(24.0); // p-6 (equivalente a 24px)
       case TaskDisplaySize.medium:
       default:
-        return const EdgeInsets.all(16.0);
+        return const EdgeInsets.all(16.0); // p-4 (equivalente a 16px)
     }
   }
 
@@ -364,8 +375,6 @@ class _TaskCardState extends State<TaskCard> {
 
   @override
   Widget build(BuildContext context) {
-    // Agora você pode usar getDueDateStatus e getPriorityColor diretamente,
-    // pois foram passados como propriedades e seus tipos estão corretos.
     final DueDateInfo dueDateInfo = widget.getDueDateStatus(
       _currentTask.dataPrazo,
       context,
@@ -377,200 +386,213 @@ class _TaskCardState extends State<TaskCard> {
     final isLoading = _isDeleting || _isUpdatingStatus || _isSavingEdit;
     final isTaskCompleted = _currentTask.estadoTarefa == TaskStatus.Finalizada;
 
-    return Card(
-      elevation: 4.0,
-      margin: const EdgeInsets.symmetric(vertical: 8.0),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Text(
-                    _currentTask.titulo,
-                    style: _getTextStyle(widget.taskDisplaySize).copyWith(
-                      fontWeight: FontWeight.bold,
-                      decoration:
-                          _currentTask.estadoTarefa == TaskStatus.Finalizada
-                              ? TextDecoration.lineThrough
-                              : null,
-                      color:
-                          _currentTask.estadoTarefa == TaskStatus.Finalizada
-                              ? Theme.of(
-                                context,
-                              ).colorScheme.onSurfaceVariant.withOpacity(0.6)
-                              : Theme.of(context).colorScheme.onSurface,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                if (!_isEditing)
-                  Row(
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.edit, size: 20),
-                        onPressed: () {
-                          setState(() {
-                            _isEditing = true;
-                          });
-                        },
-                      ),
-                      IconButton(
-                        icon: Icon(
-                          Icons.delete,
-                          size: 20,
-                          color: Theme.of(context).colorScheme.error,
-                        ),
-                        onPressed: () => _deleteTask(_currentTask.idTarefa),
-                      ),
-                    ],
-                  ),
-              ],
-            ),
-            if (!_isEditing) ...[
-              const SizedBox(height: 8.0),
-              Text(
-                _currentTask.descricao ?? 'Sem descrição',
-                style: _getTextStyle(widget.taskDisplaySize).copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  decoration:
-                      _currentTask.estadoTarefa == TaskStatus.Finalizada
-                          ? TextDecoration.lineThrough
-                          : null,
-                ),
-              ),
-              const SizedBox(height: 8.0),
+    return ConstrainedBox(
+      constraints: BoxConstraints(
+        minWidth: _getCardWidth(), // Define a largura mínima
+        maxWidth: _getCardWidth(), // Define a largura máxima (fixa)
+        minHeight: _getCardMinHeight(), // Define a altura mínima
+      ),
+      child: Card(
+        elevation: 4.0,
+        margin: const EdgeInsets.symmetric(vertical: 8.0),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12.0),
+        ),
+        child: Padding(
+          padding: _getCardPadding(), // Usa o padding dinâmico
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
               Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Icon(Icons.flag, size: 16, color: priorityColor),
-                  const SizedBox(width: 4.0),
-                  Text(
-                    _currentTask.prioridade.toString().split('.').last,
-                    style: _getTextStyle(widget.taskDisplaySize).copyWith(
-                      color: priorityColor,
-                      fontWeight: FontWeight.bold,
+                  Expanded(
+                    child: Text(
+                      _currentTask.titulo,
+                      style: _getTitleTextStyle(context).copyWith(
+                        // Usar _getTitleTextStyle
+                        fontWeight: FontWeight.bold,
+                        decoration:
+                            _currentTask.estadoTarefa == TaskStatus.Finalizada
+                                ? TextDecoration.lineThrough
+                                : null,
+                        color:
+                            _currentTask.estadoTarefa == TaskStatus.Finalizada
+                                ? Theme.of(
+                                  context,
+                                ).colorScheme.onSurfaceVariant.withOpacity(0.6)
+                                : Theme.of(context).colorScheme.onSurface,
+                      ),
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  const SizedBox(width: 16.0),
-                  Icon(
-                    Icons.calendar_today,
-                    size: 16,
-                    color: dueDateInfo.color,
-                  ),
-                  const SizedBox(width: 4.0),
-                  Text(
-                    dueDateInfo
-                        .text, // <-- Acesso correto ao 'text' de DueDateInfo
-                    style: _getTextStyle(widget.taskDisplaySize).copyWith(
-                      color: dueDateInfo.color,
-                      fontWeight:
-                          dueDateInfo.text.contains('Atrasado')
-                              ? FontWeight.bold
-                              : FontWeight.normal,
+                  if (!_isEditing)
+                    Row(
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.edit, size: 20),
+                          onPressed: () {
+                            setState(() {
+                              _isEditing = true;
+                            });
+                          },
+                        ),
+                        IconButton(
+                          icon: Icon(
+                            Icons.delete,
+                            size: 20,
+                            color: Theme.of(context).colorScheme.error,
+                          ),
+                          onPressed: () => _deleteTask(_currentTask.idTarefa),
+                        ),
+                      ],
                     ),
-                  ),
                 ],
               ),
-              const SizedBox(height: 8.0),
-              Align(
-                alignment: Alignment.bottomRight,
-                child: Checkbox(
-                  value: _currentTask.estadoTarefa == TaskStatus.Finalizada,
-                  onChanged: (bool? newValue) {
-                    if (newValue != null) {
-                      _updateTaskStatus(newValue);
+              if (!_isEditing) ...[
+                const SizedBox(height: 8.0),
+                Text(
+                  _currentTask.descricao ?? 'Sem descrição',
+                  style: _getDescriptionTextStyle(context).copyWith(
+                    // Usar _getDescriptionTextStyle
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    decoration:
+                        _currentTask.estadoTarefa == TaskStatus.Finalizada
+                            ? TextDecoration.lineThrough
+                            : null,
+                  ),
+                ),
+                const SizedBox(height: 8.0),
+                Row(
+                  children: [
+                    Icon(Icons.flag, size: 16, color: priorityColor),
+                    const SizedBox(width: 4.0),
+                    Text(
+                      _currentTask.prioridade.toString().split('.').last,
+                      style: _getDatePriorityTextStyle(context).copyWith(
+                        // Usar _getDatePriorityTextStyle
+                        color: priorityColor,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(width: 16.0),
+                    Icon(
+                      Icons.calendar_today,
+                      size: 16,
+                      color: dueDateInfo.color,
+                    ),
+                    const SizedBox(width: 4.0),
+                    Text(
+                      dueDateInfo
+                          .text, // <-- Acesso correto ao 'text' de DueDateInfo
+                      style: _getDatePriorityTextStyle(context).copyWith(
+                        // Usar _getDatePriorityTextStyle
+                        color: dueDateInfo.color,
+                        fontWeight:
+                            dueDateInfo.text.contains('Atrasado')
+                                ? FontWeight.bold
+                                : FontWeight.normal,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8.0),
+                Align(
+                  alignment: Alignment.bottomRight,
+                  child: Checkbox(
+                    value: _currentTask.estadoTarefa == TaskStatus.Finalizada,
+                    onChanged: (bool? newValue) {
+                      if (newValue != null) {
+                        _updateTaskStatus(newValue);
+                      }
+                    },
+                    activeColor: Theme.of(context).colorScheme.tertiary,
+                    checkColor: Theme.of(context).colorScheme.onTertiary,
+                  ),
+                ),
+              ] else ...[
+                // Modo de Edição (se você tiver um)
+                TextField(
+                  controller: _titleController,
+                  decoration: const InputDecoration(labelText: 'Título'),
+                ),
+                TextField(
+                  controller: _descriptionController,
+                  decoration: const InputDecoration(labelText: 'Descrição'),
+                ),
+                DropdownButtonFormField<TaskPriority>(
+                  value: _selectedPriority,
+                  onChanged: (TaskPriority? newValue) {
+                    setState(() {
+                      _selectedPriority = newValue;
+                    });
+                  },
+                  items:
+                      TaskPriority.values.map((priority) {
+                        return DropdownMenuItem(
+                          value: priority,
+                          child: Text(priority.toString().split('.').last),
+                        );
+                      }).toList(),
+                  decoration: const InputDecoration(labelText: 'Prioridade'),
+                ),
+                ListTile(
+                  title: Text(
+                    _selectedDate == null
+                        ? 'Selecionar Data de Prazo'
+                        : DateFormat('dd/MM/yyyy').format(_selectedDate!),
+                  ),
+                  trailing: const Icon(Icons.calendar_today),
+                  onTap: () async {
+                    final DateTime? picked = await showDatePicker(
+                      context: context,
+                      initialDate: _selectedDate ?? DateTime.now(),
+                      firstDate: DateTime(2000),
+                      lastDate: DateTime(2101),
+                    );
+                    if (picked != null && picked != _selectedDate) {
+                      setState(() {
+                        _selectedDate = picked;
+                      });
                     }
                   },
-                  activeColor: Theme.of(context).colorScheme.tertiary,
-                  checkColor: Theme.of(context).colorScheme.onTertiary,
                 ),
-              ),
-            ] else ...[
-              // Modo de Edição (se você tiver um)
-              TextField(
-                controller: _titleController,
-                decoration: const InputDecoration(labelText: 'Título'),
-              ),
-              TextField(
-                controller: _descriptionController,
-                decoration: const InputDecoration(labelText: 'Descrição'),
-              ),
-              DropdownButtonFormField<TaskPriority>(
-                value: _selectedPriority,
-                onChanged: (TaskPriority? newValue) {
-                  setState(() {
-                    _selectedPriority = newValue;
-                  });
-                },
-                items:
-                    TaskPriority.values.map((priority) {
-                      return DropdownMenuItem(
-                        value: priority,
-                        child: Text(priority.toString().split('.').last),
-                      );
-                    }).toList(),
-                decoration: const InputDecoration(labelText: 'Prioridade'),
-              ),
-              ListTile(
-                title: Text(
-                  _selectedDate == null
-                      ? 'Selecionar Data de Prazo'
-                      : DateFormat('dd/MM/yyyy').format(_selectedDate!),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () {
+                        setState(() {
+                          _isEditing = false;
+                          // Resetar os controladores caso o usuário cancele
+                          _titleController.text = _currentTask.titulo;
+                          _descriptionController.text =
+                              _currentTask.descricao ?? '';
+                          _selectedPriority = _currentTask.prioridade;
+                          _selectedDate = _currentTask.dataPrazo;
+                        });
+                      },
+                      child: const Text('Cancelar'),
+                    ),
+                    ElevatedButton(
+                      onPressed: _isSavingEdit ? null : () => _saveEditedTask(),
+                      child:
+                          _isSavingEdit
+                              ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                              : const Text('Salvar'),
+                    ),
+                  ],
                 ),
-                trailing: const Icon(Icons.calendar_today),
-                onTap: () async {
-                  final DateTime? picked = await showDatePicker(
-                    context: context,
-                    initialDate: _selectedDate ?? DateTime.now(),
-                    firstDate: DateTime(2000),
-                    lastDate: DateTime(2101),
-                  );
-                  if (picked != null && picked != _selectedDate) {
-                    setState(() {
-                      _selectedDate = picked;
-                    });
-                  }
-                },
-              ),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  TextButton(
-                    onPressed: () {
-                      setState(() {
-                        _isEditing = false;
-                        // Resetar os controladores caso o usuário cancele
-                        _titleController.text = _currentTask.titulo;
-                        _descriptionController.text =
-                            _currentTask.descricao ?? '';
-                        _selectedPriority = _currentTask.prioridade;
-                        _selectedDate = _currentTask.dataPrazo;
-                      });
-                    },
-                    child: const Text('Cancelar'),
-                  ),
-                  ElevatedButton(
-                    onPressed: _isSavingEdit ? null : () => _saveEditedTask(),
-                    child:
-                        _isSavingEdit
-                            ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
-                              ),
-                            )
-                            : const Text('Salvar'),
-                  ),
-                ],
-              ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );

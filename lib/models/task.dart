@@ -84,7 +84,7 @@ class Task {
 
   factory Task.fromJson(Map<String, dynamic> json) {
     return Task(
-      idTarefa: json['id_tarefa'] as int,
+      idTarefa: json['id_tarefa'] as int ?? 0,
       titulo: json['titulo'] as String,
       descricao: json['descricao'] as String?,
       dataPrazo:

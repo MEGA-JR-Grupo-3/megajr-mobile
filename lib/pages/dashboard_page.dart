@@ -97,8 +97,6 @@ class _DashboardPageState extends State<DashboardPage> {
           ),
         );
       }
-      // O AuthProvider já lida com o redirecionamento
-      //Navigator.of(context).pushReplacementNamed('/login');
       return;
     }
 
@@ -124,7 +122,7 @@ class _DashboardPageState extends State<DashboardPage> {
                     .where((task) => task.estadoTarefa == TaskStatus.Finalizada)
                     .length;
           });
-          _applyFiltersAndSort(); // Aplica filtros e ordenação após carregar
+          _applyFiltersAndSort();
         }
       } else if (response.statusCode == 401 || response.statusCode == 403) {
         if (mounted) {
@@ -134,7 +132,6 @@ class _DashboardPageState extends State<DashboardPage> {
             ),
           );
         }
-        // O AuthProvider já desloga e redireciona automaticamente
         await authProvider.signOut();
       } else {
         if (mounted) {
@@ -232,7 +229,6 @@ class _DashboardPageState extends State<DashboardPage> {
             compareResult = aDesc.compareTo(bDesc);
             break;
           default:
-            // Fallback para ordenação padrão por prioridade e depois data se _sortBy for 'all' ou não reconhecido
             final aPriority = _priorityOrder[a.prioridade] ?? 99;
             final bPriority = _priorityOrder[b.prioridade] ?? 99;
             compareResult = aPriority.compareTo(bPriority);
@@ -252,9 +248,6 @@ class _DashboardPageState extends State<DashboardPage> {
 
         return _sortOrder == 'asc' ? compareResult : -compareResult;
       });
-
-      // Tarefas finalizadas não são reordenáveis e podem ter uma ordem padrão (ex: por data de conclusão, ou simplesmente após as pendentes)
-      // Por simplicidade, as mantemos na ordem em que aparecem no array após a filtragem de status
       completedTasks.sort((a, b) {
         if (a.dataPrazo == null && b.dataPrazo == null) return 0;
         if (a.dataPrazo == null) return 1;
@@ -270,18 +263,17 @@ class _DashboardPageState extends State<DashboardPage> {
   void _handleTaskAdded(Task newTask) {
     setState(() {
       _allTasks.add(newTask);
-      _applyFiltersAndSort(); // Reaplicar filtros para incluir a nova tarefa
-      _showAddTaskForm = false; // Fechar o formulário
+      _applyFiltersAndSort();
+      _showAddTaskForm = false;
     });
-    _loadTasks(); // Recarregar para garantir sincronia e ordem do backend
   }
 
   void _handleTaskDeleted(String taskId) {
     setState(() {
       _allTasks.removeWhere((task) => task.idTarefa == taskId);
-      _applyFiltersAndSort(); // Reaplicar filtros
+      _applyFiltersAndSort();
     });
-    _loadTasks(); // Recarregar para garantir sincronia
+    _loadTasks();
   }
 
   void _handleTaskUpdated(Task updatedTask) {
@@ -290,9 +282,9 @@ class _DashboardPageState extends State<DashboardPage> {
           _allTasks.map((task) {
             return task.idTarefa == updatedTask.idTarefa ? updatedTask : task;
           }).toList();
-      _applyFiltersAndSort(); // Reaplicar filtros
+      _applyFiltersAndSort();
     });
-    _loadTasks(); // Recarregar para garantir sincronia (especialmente se o status mudou)
+    _loadTasks();
   }
 
   void _handleDeleteAllCompleted() async {
@@ -349,7 +341,7 @@ class _DashboardPageState extends State<DashboardPage> {
               ),
             );
           }
-          _loadTasks(); // Recarregar todas as tarefas
+          _loadTasks();
         } else if (response.statusCode == 401 || response.statusCode == 403) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -409,7 +401,6 @@ class _DashboardPageState extends State<DashboardPage> {
         ],
       ),
       endDrawer: Drawer(
-        // Adicione o conteúdo do seu Drawer aqui
         child: ListView(
           padding: EdgeInsets.zero,
           children: <Widget>[
@@ -449,7 +440,7 @@ class _DashboardPageState extends State<DashboardPage> {
               leading: const Icon(Icons.home),
               title: const Text('Dashboard'),
               onTap: () {
-                Navigator.pop(context); // Fecha o drawer
+                Navigator.pop(context);
               },
             ),
             ListTile(
@@ -527,11 +518,9 @@ class _DashboardPageState extends State<DashboardPage> {
       body: Stack(
         children: [
           Column(
-            // Use Column em vez de SingleChildScrollView
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Padding(
-                // Adicione padding para os elementos acima da lista
                 padding: const EdgeInsets.all(16.0),
                 child: Column(
                   children: [
@@ -715,9 +704,8 @@ class _DashboardPageState extends State<DashboardPage> {
                     const SizedBox(height: 16),
                   ],
                 ),
-              ), // Fim do Padding para os controles
+              ),
               Expanded(
-                // O ListView.builder precisa estar dentro de um Expanded
                 child:
                     _isLoadingTasks
                         ? const Center(child: CircularProgressIndicator())
@@ -735,22 +723,25 @@ class _DashboardPageState extends State<DashboardPage> {
                           itemCount: _filteredTasks.length,
                           itemBuilder: (context, index) {
                             final task = _filteredTasks[index];
-                            return TaskCard(
-                              tarefa: task,
-                              onTaskDeleted: (taskId) {
-                                _handleTaskDeleted(taskId.toString());
-                              },
-                              onTaskUpdated: (updatedTask) {
-                                _handleTaskUpdated(updatedTask);
-                              },
-                              firebaseIdToken: authProvider.firebaseIdToken!,
-                              taskDisplaySize: _taskDisplaySize,
-                              getDueDateStatus: getDueDateStatus,
-                              getPriorityColor: getPriorityColor,
+                            return Center(
+                              // Adicione o Center aqui
+                              child: TaskCard(
+                                tarefa: task,
+                                onTaskDeleted: (taskId) {
+                                  _handleTaskDeleted(taskId.toString());
+                                },
+                                onTaskUpdated: (updatedTask) {
+                                  _handleTaskUpdated(updatedTask);
+                                },
+                                firebaseIdToken: authProvider.firebaseIdToken!,
+                                taskDisplaySize: _taskDisplaySize,
+                                getDueDateStatus: getDueDateStatus,
+                                getPriorityColor: getPriorityColor,
+                              ),
                             );
                           },
                         ),
-              ), // Fim do Expanded
+              ),
             ],
           ),
           if (_showAddTaskForm)
