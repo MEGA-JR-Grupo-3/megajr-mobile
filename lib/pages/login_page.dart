@@ -1,7 +1,7 @@
 // lib/pages/login_page.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:mobile_megajr_grupo3/services/auth_service.dart';
+import 'package:mobile_megajr_grupo3/providers/auth_provider.dart';
 import 'package:mobile_megajr_grupo3/services/api_service.dart';
 import 'package:mobile_megajr_grupo3/widgets/custom_button.dart';
 import 'package:mobile_megajr_grupo3/theme/app_theme.dart';
@@ -35,12 +35,12 @@ class _LoginScreenState extends State<LoginScreen> {
 
     setState(() {
       _isLoading = true;
-      _errorMessage = null; // Limpa mensagens de erro anteriores
+      _errorMessage = null;
     });
 
     try {
-      final authService = Provider.of<AuthService>(context, listen: false);
-      final userCredential = await authService.signInWithEmailAndPassword(
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final userCredential = await authProvider.signInWithEmailAndPassword(
         _emailController.text,
         _passwordController.text,
       );
@@ -96,8 +96,8 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
-      final authService = Provider.of<AuthService>(context, listen: false);
-      final userCredential = await authService.signInWithGoogle();
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final userCredential = await authProvider.signInWithGoogle();
 
       if (userCredential != null && userCredential.user != null) {
         final user = userCredential.user!;
@@ -122,7 +122,7 @@ class _LoginScreenState extends State<LoginScreen> {
             errorText = 'Erro do backend: ${backendResponse.body}';
           }
           _showErrorDialog(errorText);
-          await authService
+          await authProvider
               .signOut(); // Deslogar do Firebase se o backend falhar
         }
       } else {

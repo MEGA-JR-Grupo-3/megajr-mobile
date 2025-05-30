@@ -51,11 +51,14 @@ class AddTaskFormState extends State<AddTaskForm> {
 
     final String firebaseIdToken = widget.firebaseIdToken;
 
-    if (firebaseIdToken == null) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Faça login para adicionar tarefas.")),
-      );
+    // Verificação de nulo para firebaseIdToken, caso o widget não tenha sido montado ou o token seja nulo
+    if (firebaseIdToken == null || !mounted) {
+      if (mounted) {
+        // Verifica se o widget ainda está montado antes de mostrar o SnackBar
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Faça login para adicionar tarefas.")),
+        );
+      }
       return;
     }
 
@@ -85,20 +88,22 @@ class AddTaskFormState extends State<AddTaskForm> {
           Navigator.of(context).pop();
         }
       } else {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Erro ao adicionar tarefa: ${response.statusCode} - ${response.reasonPhrase}',
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Erro ao adicionar tarefa: ${response.statusCode} - ${response.reasonPhrase}',
+              ),
             ),
-          ),
-        );
+          );
+        }
       }
     } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erro de conexão ao adicionar tarefa: $e')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro de conexão ao adicionar tarefa: $e')),
+        );
+      }
     }
   }
 
@@ -108,121 +113,124 @@ class AddTaskFormState extends State<AddTaskForm> {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.0)),
       child: Container(
         padding: const EdgeInsets.all(24.0),
-        width: 330,
+        width: 330, // Você pode ajustar esta largura se necessário
         decoration: BoxDecoration(
           color: Theme.of(context).colorScheme.surface,
           borderRadius: BorderRadius.circular(8.0),
         ),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                "Adicionar Nova Tarefa",
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: Theme.of(context).colorScheme.onSurface,
+        child: SingleChildScrollView(
+          // Este é o widget chave para o scroll
+          child: Form(
+            key: _formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min, // Mantém a coluna minimizada
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  "Adicionar Nova Tarefa",
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 20),
-              TextFormField(
-                decoration: const InputDecoration(
-                  labelText: "Título:",
-                  border: OutlineInputBorder(),
+                const SizedBox(height: 20),
+                TextFormField(
+                  decoration: const InputDecoration(
+                    labelText: "Título:",
+                    border: OutlineInputBorder(),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return "Por favor, insira um título.";
+                    }
+                    return null;
+                  },
+                  onSaved: (value) {
+                    _titulo = value!;
+                  },
                 ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return "Por favor, insira um título.";
-                  }
-                  return null;
-                },
-                onSaved: (value) {
-                  _titulo = value!;
-                },
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                decoration: const InputDecoration(
-                  labelText: "Descrição:",
-                  border: OutlineInputBorder(),
+                const SizedBox(height: 12),
+                TextFormField(
+                  decoration: const InputDecoration(
+                    labelText: "Descrição:",
+                    border: OutlineInputBorder(),
+                  ),
+                  maxLines: 3, // Permite múltiplas linhas para a descrição
+                  onSaved: (value) {
+                    _descricao = value!;
+                  },
                 ),
-                maxLines: 3,
-                onSaved: (value) {
-                  _descricao = value!;
-                },
-              ),
-              const SizedBox(height: 12),
-              GestureDetector(
-                onTap: () => _selectDate(context),
-                child: AbsorbPointer(
-                  child: TextFormField(
-                    decoration: InputDecoration(
-                      labelText: "Data Prazo:",
-                      border: const OutlineInputBorder(),
-                      suffixIcon: const Icon(Icons.calendar_today),
-                    ),
-                    controller: TextEditingController(
-                      text:
-                          _dataPrazo == null
-                              ? ""
-                              : "${_dataPrazo!.day}/${_dataPrazo!.month}/${_dataPrazo!.year}",
+                const SizedBox(height: 12),
+                GestureDetector(
+                  onTap: () => _selectDate(context),
+                  child: AbsorbPointer(
+                    child: TextFormField(
+                      decoration: InputDecoration(
+                        labelText: "Data Prazo:",
+                        border: const OutlineInputBorder(),
+                        suffixIcon: const Icon(Icons.calendar_today),
+                      ),
+                      controller: TextEditingController(
+                        text:
+                            _dataPrazo == null
+                                ? ""
+                                : "${_dataPrazo!.day}/${_dataPrazo!.month}/${_dataPrazo!.year}",
+                      ),
                     ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                decoration: const InputDecoration(
-                  labelText: "Prioridade:",
-                  border: OutlineInputBorder(),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  decoration: const InputDecoration(
+                    labelText: "Prioridade:",
+                    border: OutlineInputBorder(),
+                  ),
+                  value: _prioridade,
+                  items:
+                      <String>[
+                        "Baixa",
+                        "Normal",
+                        "Alta",
+                        "Urgente",
+                      ].map<DropdownMenuItem<String>>((String value) {
+                        return DropdownMenuItem<String>(
+                          value: value,
+                          child: Text(value),
+                        );
+                      }).toList(),
+                  onChanged: (String? newValue) {
+                    setState(() {
+                      _prioridade = newValue!;
+                    });
+                  },
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return "Por favor, selecione uma prioridade.";
+                    }
+                    return null;
+                  },
                 ),
-                value: _prioridade,
-                items:
-                    <String>[
-                      "Baixa",
-                      "Normal",
-                      "Alta",
-                      "Urgente",
-                    ].map<DropdownMenuItem<String>>((String value) {
-                      return DropdownMenuItem<String>(
-                        value: value,
-                        child: Text(value),
-                      );
-                    }).toList(),
-                onChanged: (String? newValue) {
-                  setState(() {
-                    _prioridade = newValue!;
-                  });
-                },
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return "Por favor, selecione uma prioridade.";
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 24),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  TextButton(
-                    onPressed: widget.onCancel,
-                    child: const Text("Cancelar"),
-                  ),
-                  const SizedBox(width: 8),
-                  ElevatedButton(
-                    onPressed: _handleSubmit,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue,
-                      foregroundColor: Colors.white,
+                const SizedBox(height: 24),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: widget.onCancel,
+                      child: const Text("Cancelar"),
                     ),
-                    child: const Text("Salvar"),
-                  ),
-                ],
-              ),
-            ],
+                    const SizedBox(width: 8),
+                    ElevatedButton(
+                      onPressed: _handleSubmit,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blue,
+                        foregroundColor: Colors.white,
+                      ),
+                      child: const Text("Salvar"),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),

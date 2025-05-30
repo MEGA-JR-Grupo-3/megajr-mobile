@@ -1,8 +1,8 @@
 // lib/widgets/google_login_button.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import '../services/auth_service.dart';
+import 'package:mobile_megajr_grupo3/providers/auth_provider.dart';
+import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
 
 class GoogleLoginButton extends StatefulWidget {
   final ValueChanged<User>? onSuccess;
@@ -29,7 +29,7 @@ class _GoogleLoginButtonState extends State<GoogleLoginButton> {
 
   @override
   Widget build(BuildContext context) {
-    final authService = Provider.of<AuthService>(context, listen: false);
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
 
     final double translateY = _isHovering ? -5.0 : 0.0;
     final double elevation = _isHovering ? 8.0 : 4.0;
@@ -49,7 +49,7 @@ class _GoogleLoginButtonState extends State<GoogleLoginButton> {
                   });
                   try {
                     final UserCredential? userCredential =
-                        await authService.signInWithGoogle();
+                        await authProvider.signInWithGoogle();
                     if (userCredential != null && userCredential.user != null) {
                       widget.onSuccess?.call(userCredential.user!);
                     } else {

@@ -1,12 +1,12 @@
 // lib/widgets/custom_sidebar.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:async';
 import 'package:intl/intl.dart';
-import 'package:mobile_megajr_grupo3/services/auth_service.dart';
+import 'package:mobile_megajr_grupo3/providers/auth_provider.dart';
+import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 class CustomSidebar extends StatefulWidget {
@@ -114,9 +114,9 @@ class _CustomSidebarState extends State<CustomSidebar> {
   }
 
   void _handleLogout() async {
-    final authService = Provider.of<AuthService>(context, listen: false);
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
     try {
-      await authService.signOut();
+      await authProvider.signOut();
 
       if (!mounted) return;
 

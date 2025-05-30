@@ -1,17 +1,20 @@
+// lib/providers/auth_provider.dart
+
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:google_sign_in/google_sign_in.dart';
 
 class AuthProvider with ChangeNotifier {
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  final GoogleSignIn _googleSignIn = GoogleSignIn();
   User? _user;
   bool _isAuthenticated = false;
   String? _firebaseIdToken;
   String _registeredName = "";
   bool _isAuthDataLoaded = false;
-
   User? get user => _user;
   bool get isAuthenticated => _isAuthenticated;
   String? get firebaseIdToken => _firebaseIdToken;
@@ -81,8 +84,71 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
+  // MÉTODO PARA LOGIN COM E-MAIL E SENHA
+  Future<UserCredential?> signInWithEmailAndPassword(
+    String email,
+    String password,
+  ) async {
+    try {
+      UserCredential userCredential = await _auth.signInWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+      return userCredential;
+    } on FirebaseAuthException catch (e) {
+      rethrow;
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  // MÉTODO PARA LOGIN COM GOOGLE
+  Future<UserCredential?> signInWithGoogle() async {
+    try {
+      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+      if (googleUser == null) {
+        return null;
+      }
+      final GoogleSignInAuthentication googleAuth =
+          await googleUser.authentication;
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+      UserCredential userCredential = await _auth.signInWithCredential(
+        credential,
+      );
+      return userCredential;
+    } on FirebaseAuthException catch (e) {
+      rethrow;
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  // MÉTODO DE REGISTRO
+  Future<UserCredential?> createUserWithEmailAndPassword(
+    String email,
+    String password,
+    String? displayName,
+  ) async {
+    try {
+      UserCredential userCredential = await _auth
+          .createUserWithEmailAndPassword(email: email, password: password);
+      if (displayName != null && userCredential.user != null) {
+        await userCredential.user!.updateDisplayName(displayName);
+      }
+      return userCredential;
+    } on FirebaseAuthException catch (e) {
+      rethrow;
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  // MÉTODO DE LOGOUT
   Future<void> signOut() async {
+    await _googleSignIn.signOut();
     await _auth.signOut();
-    notifyListeners();
   }
 }
